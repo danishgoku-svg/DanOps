@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>DanOps – Pizzeria Operations</title>
+  <link rel="manifest" href="manifest.json" />
+
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0b0f17" />
+
+  <!-- Tailwind CSS & Utility Libraries -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, select, textarea {
+      user-select: auto;
+    }
+    /* Hide scrollbars for clean kitchen mobile appearance */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Print media styling */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .no-print, header, nav, button, .modal-backdrop, #role-tester-bar, #login-overlay {
+        display: none !important;
+      }
+      #print-kitchen-doc {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 8px !important;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #111;
+        padding: 6px 10px;
+        text-align: left;
+        font-size: 12px;
+      }
+      th {
+        background-color: #f3f4f6;
+        font-weight: bold;
+      }
+    }
+    @media screen {
+      #print-kitchen-doc {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen pb-24 antialiased">
+
+  <!-- PRINTABLE DOCUMENT (Targeted by system print, PDF download, and image save) -->
+  <div id="print-kitchen-doc" class="bg-white text-slate-900 p-6 rounded-2xl max-w-2xl mx-auto">
+    <div class="border-b-2 border-slate-900 pb-3 mb-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-black tracking-tight text-slate-900 flex items-center gap-1.5">
+          <span>🍕</span> DanOps – Pizzeria Operations
+        </h1>
+        <p class="text-xs text-slate-600 font-semibold mt-0.5">Daily Kitchen Preparation & Production Schedule</p>
+      </div>
+      <div class="text-right text-xs">
+        <p><strong>Date:</strong> <span id="print-doc-date">2026-10-22</span></p>
+        <p class="text-slate-500 text-[10px]">Printed: <span id="print-doc-time"></span></p>
+      </div>
+    </div>
+
+    <table class="w-full text-left text-xs border-collapse">
+      <thead>
+        <tr class="bg-slate-100 border border-slate-800">
+          <th class="p-2 border border-slate-300 w-8">#</th>
+          <th class="p-2 border border-slate-300">Ingredient / Dish</th>
+          <th class="p-2 border border-slate-300">Station</th>
+          <th class="p-2 border border-slate-300 text-center w-24">Allocated Target</th>
+          <th class="p-2 border border-slate-300 text-center w-24">Quantity Done</th>
+          <th class="p-2 border border-slate-300 text-center w-20">Status</th>
+        </tr>
+      </thead>
+      <tbody id="print-doc-table-body">
+        <!-- Rendered dynamically -->
+      </tbody>
+    </table>
+
+    <div class="mt-6 pt-4 border-t border-slate-300 flex justify-between items-center text-xs text-slate-700">
+      <div>Head Chef: <strong>Chef Dan</strong></div>
+      <div>Kitchen Supervisor Sign-off: _______________________</div>
+    </div>
+  </div>
+
+  <!-- AUTHENTICATION / LOGIN OVERLAY -->
+  <div id="login-overlay" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
+    <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+      <div class="w-14 h-14 mx-auto bg-amber-500/20 border border-amber-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+        🍕
+      </div>
+      <div>
+        <h2 class="text-xl font-black text-white">DanOps</h2>
+        <p class="text-xs text-amber-400 font-bold uppercase tracking-wider">Pizzeria Operations</p>
+        <p class="text-[11px] text-slate-400 mt-1">Sign in to your kitchen station</p>
+      </div>
+
+      <form id="login-form" onsubmit="handleUserLogin(event)" class="space-y-3 text-left">
+        <div>
+          <label class="text-[11px] text-slate-400 font-bold uppercase block mb-1">Username / Station ID</label>
+          <input id="login-username" required placeholder="e.g. chef.dan or alex.dough" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-amber-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-[11px] text-slate-400 font-bold uppercase block mb-1">Password</label>
+          <input id="login-password" type="password" required placeholder="••••••••" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:border-amber-500 outline-none" />
+        </div>
+        <button type="submit" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black text-sm active:scale-95 transition shadow-lg shadow-amber-500/20">
+          Sign In to Kitchen Station →
+        </button>
+      </form>
+
+      <div class="pt-2 border-t border-slate-800/80 text-left">
+        <p class="text-[10px] text-slate-500 uppercase font-bold">Quick Demo Accounts:</p>
+        <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
+          <span>👑 Admin: <strong class="text-amber-400">chef.dan</strong> / <strong class="text-slate-300">admin123</strong></span>
+          <button type="button" onclick="quickFillLogin('chef.dan', 'admin123')" class="text-amber-400 font-bold hover:underline">Fill</button>
+        </div>
+        <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
+          <span>👨‍🍳 Cook: <strong class="text-indigo-400">alex.dough</strong> / <strong class="text-slate-300">cook123</strong></span>
+          <button type="button" onclick="quickFillLogin('alex.dough', 'cook123')" class="text-indigo-400 font-bold hover:underline">Fill</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APPLICATION SHELL -->
+  <div class="max-w-xl mx-auto min-h-screen flex flex-col relative no-print">
+
+    <!-- TOP HEADER -->
+    <header class="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-3.5 py-2.5">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-lg shadow">
+            🍕
+          </div>
+          <div>
+            <div class="flex items-center space-x-1.5">
+              <span class="text-base font-black text-white tracking-tight">DanOps</span>
+              <span id="user-role-badge" class="text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                HEAD CHEF (ADMIN)
+              </span>
+            </div>
+            <p id="user-greeting" class="text-[11px] text-slate-400 font-medium">Logged in: Chef Dan</p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-1.5">
+          <button onclick="handleLogout()" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95">
+            Sign Out
+          </button>
+        </div>
+      </div>
+
+      <!-- Date Navigator -->
+      <div class="mt-2.5 flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl px-2 py-1">
+        <button onclick="navigateDay(-1)" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 text-xs">◀</button>
+        
+        <div class="flex items-center space-x-1">
+          <span class="text-xs text-slate-400">📅</span>
+          <input id="selected-date-picker" type="date" onchange="handleDatePickerChange(event)" class="bg-transparent text-amber-400 font-extrabold text-xs outline-none cursor-pointer" />
+        </div>
+
+        <div class="flex items-center space-x-1">
+          <button onclick="jumpToToday()" class="text-[10px] bg-slate-800 text-slate-300 font-bold px-2 py-1 rounded-md active:scale-95">Today</button>
+          <button onclick="navigateDay(1)" class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 text-xs">▶</button>
+        </div>
+      </div>
+
+      <!-- Action Strip: Print/Export & Save -->
+      <div class="mt-2 flex items-center justify-between gap-1.5">
+        <button onclick="openPrintModal()" class="flex-1 py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center space-x-1 active:scale-95 shadow">
+          <span>🖨️</span>
+          <span>Print / Export Prep</span>
+        </button>
+
+        <button onclick="triggerManualSave()" class="py-1.5 px-3 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center space-x-1 active:scale-95 shadow">
+          <span>💾</span>
+          <span>Save Prep</span>
+        </button>
+
+        <button id="header-add-item-btn" onclick="openMasterItemModal()" class="flex-1 py-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-xs font-black flex items-center justify-center space-x-1 active:scale-95 shadow shadow-amber-500/20">
+          <span>+ Master Item</span>
+        </button>
+      </div>
+
+      <!-- Filter Stations Chips -->
+      <div class="mt-2 flex items-center space-x-1.5 overflow-x-auto pb-0.5 text-xs no-scrollbar" id="station-filter-strip">
+        <!-- Populated dynamically -->
+      </div>
+    </header>
+
+    <!-- MAIN BODY SECTIONS -->
+    <main class="flex-1 px-3.5 py-3 space-y-3">
+
+      <!-- TAB 1: DAILY PREP SHEET -->
+      <section id="tab-daily-prep" class="space-y-2.5">
+        <!-- Compact Metrics Ribbon -->
+        <div class="grid grid-cols-4 gap-1.5 text-center bg-slate-900 border border-slate-800 rounded-xl p-2">
+          <div>
+            <span class="text-[9px] text-slate-400 uppercase font-bold">Total Items</span>
+            <div id="stat-total" class="text-xs font-black text-white">0</div>
+          </div>
+          <div>
+            <span class="text-[9px] text-amber-400 uppercase font-bold">In Progress</span>
+            <div id="stat-inprogress" class="text-xs font-black text-amber-400">0</div>
+          </div>
+          <div>
+            <span class="text-[9px] text-emerald-400 uppercase font-bold">Done</span>
+            <div id="stat-done" class="text-xs font-black text-emerald-400">0</div>
+          </div>
+          <div>
+            <span class="text-[9px] text-sky-400 uppercase font-bold">Pace</span>
+            <div id="stat-pace" class="text-xs font-black text-sky-400">0%</div>
+          </div>
+        </div>
+
+        <!-- High-Density Kitchen Prep List -->
+        <div id="daily-prep-container" class="space-y-1.5">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 2: MASTER INGREDIENT & DISH CATALOG (Persistent Forever) -->
+      <section id="tab-master-catalog" class="hidden space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-white">Master Ingredient & Dough Catalog</h2>
+            <p class="text-[10px] text-slate-400">Items saved here persist across all calendar days automatically</p>
+          </div>
+          <button onclick="openMasterItemModal()" class="px-2.5 py-1 text-xs font-black rounded-lg bg-amber-500 text-slate-950">
+            + New Item
+          </button>
+        </div>
+
+        <div id="master-catalog-list" class="space-y-1.5">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 3: STATION MANAGER (Admin Controlled) -->
+      <section id="tab-stations" class="hidden space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-white">Pizzeria Station Manager</h2>
+            <p class="text-[10px] text-slate-400">Admin can add, rename, edit or delete kitchen stations</p>
+          </div>
+          <button onclick="openStationModal()" class="px-2.5 py-1 text-xs font-black rounded-lg bg-indigo-600 text-white">
+            + Add Station
+          </button>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex justify-between items-center text-xs">
+          <div>
+            <p class="font-bold text-rose-400">Delete All Stations</p>
+            <p class="text-[10px] text-slate-400">Start with a clean slate</p>
+          </div>
+          <button onclick="deleteAllStations()" class="px-2 py-1 text-xs font-bold rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            🗑️ Clear All
+          </button>
+        </div>
+
+        <div id="stations-list" class="space-y-1.5">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 4: PRODUCTION ANALYTICS (Totals Till Date) -->
+      <section id="tab-analytics" class="hidden space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-white">Production Analytics</h2>
+            <p class="text-[10px] text-slate-400">Total ingredients & dishes prepped till date</p>
+          </div>
+          <select id="analytics-filter-range" onchange="renderAnalytics()" class="bg-slate-900 border border-slate-800 text-xs font-bold rounded-lg px-2 py-1 text-amber-400 outline-none">
+            <option value="month">Current Month Total</option>
+            <option value="7days">Past 7 Days</option>
+            <option value="all">All-Time Till Date</option>
+          </select>
+        </div>
+
+        <div id="analytics-summary-cards" class="space-y-1.5">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 5: COOKS & PASSWORDS (Strict Admin Only) -->
+      <section id="tab-staff" class="hidden space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-white">Cooks & Passwords (Admin Only)</h2>
+            <p class="text-[10px] text-slate-400">Allocate credentials and generate private WhatsApp links</p>
+          </div>
+          <button onclick="openStaffModal()" class="px-2.5 py-1 text-xs font-black rounded-lg bg-amber-500 text-slate-950">
+            + Allocate Cook
+          </button>
+        </div>
+
+        <div id="staff-members-list" class="space-y-2">
+          <!-- Rendered dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 6: CLOUD & BACKUP (Admin Only) -->
+      <section id="tab-cloud" class="hidden space-y-2.5">
+        <h2 class="text-sm font-black text-white">Cloud Sync & Data Backup</h2>
+        
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+          <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Device Backup File</span>
+          <p class="text-xs text-slate-400">Save a complete snapshot of all stations, catalog recipes, and daily prep logs.</p>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button onclick="exportBackupData()" class="py-2 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-bold active:scale-95">
+              📥 Export Backup
+            </button>
+            <label class="py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold text-center cursor-pointer flex items-center justify-center active:scale-95">
+              <span>📤 Restore Backup</span>
+              <input type="file" accept=".json" onchange="importBackupData(event)" class="hidden" />
+            </label>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+          <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Cloud Sync Configuration</span>
+          <p class="text-xs text-slate-400">Currently persisting safely to your device's browser memory (localStorage). To sync across 8 phones in real-time, link a free Google Firebase Firestore database.</p>
+          <input id="firebase-config-input" placeholder="Paste Firebase Config JSON here (optional)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-300 outline-none" />
+          <button onclick="saveFirebaseConfig()" class="w-full py-2 rounded-lg bg-emerald-600 text-white font-bold text-xs active:scale-95">
+            Save Cloud Connection
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- FLOATING BOTTOM NAVIGATION BAR -->
+    <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 max-w-xl mx-auto px-1 py-1.5 flex items-center justify-around no-print">
+      <button onclick="switchTab('daily-prep')" id="nav-daily-prep" class="flex flex-col items-center py-1 px-2 text-amber-400 font-black">
+        <span class="text-base">📋</span>
+        <span class="text-[9px] mt-0.5">Prep</span>
+      </button>
+
+      <button onclick="switchTab('master-catalog')" id="nav-master-catalog" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">📦</span>
+        <span class="text-[9px] mt-0.5">Catalog</span>
+      </button>
+
+      <button onclick="switchTab('stations')" id="nav-stations" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">🍕</span>
+        <span class="text-[9px] mt-0.5">Stations</span>
+      </button>
+
+      <button onclick="switchTab('analytics')" id="nav-analytics" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">📊</span>
+        <span class="text-[9px] mt-0.5">Totals</span>
+      </button>
+
+      <button onclick="switchTab('staff')" id="nav-staff" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">👥</span>
+        <span class="text-[9px] mt-0.5">Cooks</span>
+      </button>
+
+      <button onclick="switchTab('cloud')" id="nav-cloud" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">☁️</span>
+        <span class="text-[9px] mt-0.5">Cloud</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- MODAL: PRINT & EXPORT PREVIEW -->
+  <div id="modal-print" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <div>
+          <h3 class="font-black text-sm text-white flex items-center gap-1.5">
+            <span>🍕</span> Print & Export Prep Sheet
+          </h3>
+          <p class="text-[10px] text-slate-400">Choose your preferred output format</p>
+        </div>
+        <button onclick="closeModal('modal-print')" class="text-slate-400 text-sm p-1">✕</button>
+      </div>
+
+      <!-- Preview Scroller Container -->
+      <div id="modal-print-preview-container" class="flex-1 overflow-y-auto bg-white rounded-xl p-3 border border-slate-300">
+        <!-- Exact clone populated on open -->
+      </div>
+
+      <!-- Export Action Strip -->
+      <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800">
+        <button onclick="executeSystemPrint()" class="py-2.5 rounded-xl bg-slate-800 text-slate-100 font-black text-xs flex items-center justify-center space-x-1 border border-slate-700 active:scale-95 shadow">
+          <span>🖨️</span>
+          <span>Print</span>
+        </button>
+        <button onclick="executePdfDownload()" class="py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs flex items-center justify-center space-x-1 active:scale-95 shadow">
+          <span>📄</span>
+          <span>Save PDF</span>
+        </button>
+        <button onclick="executeImageExport()" class="py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs flex items-center justify-center space-x-1 active:scale-95 shadow">
+          <span>🖼️</span>
+          <span>Save Image</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast-msg" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-black text-xs shadow-xl transition-all duration-300">
+    Saved Successfully!
+  </div>
+
+  <!-- MODAL: ADD / EDIT MASTER ITEM (Admin Only) -->
+  <div id="modal-master-item" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <h3 id="modal-item-title" class="font-black text-sm text-white">Add Master Catalog Item</h3>
+        <button onclick="closeModal('modal-master-item')" class="text-slate-400 text-sm">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveMasterItem(event)" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-item-id" />
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Item / Ingredient / Dish Name *</label>
+          <input id="item-name" required placeholder="e.g. Neapolitan Pizza Dough Balls 260g" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">Station *</label>
+            <select id="item-station" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">Unit of Measurement *</label>
+            <select id="item-unit" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+              <option value="kg">kg (Kilograms)</option>
+              <option value="g">g (Grams)</option>
+              <option value="L">L (Liters)</option>
+              <option value="portions">portions / balls</option>
+              <option value="trays">trays</option>
+              <option value="boxes">boxes</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Default Daily Target Qty</label>
+          <input id="item-default-target" type="number" step="any" placeholder="0" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Chef Prep Notes / Specs</label>
+          <input id="item-notes" placeholder="e.g. 65% hydration, proof 24h at 18°C" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs active:scale-95 shadow">
+          Save Item (Persists for All Days)
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD / EDIT STATION (Admin Only) -->
+  <div id="modal-station" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <h3 id="modal-station-title" class="font-black text-sm text-white">Add Kitchen Station</h3>
+        <button onclick="closeModal('modal-station')" class="text-slate-400 text-sm">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveStation(event)" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-station-id" />
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Station Name *</label>
+          <input id="station-name-input" required placeholder="e.g. Dough & Fermentation or Oven Station" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-indigo-500 outline-none" />
+        </div>
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Station Emoji / Icon</label>
+          <input id="station-icon-input" placeholder="e.g. 🍕 or 🔥" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-indigo-500 outline-none" />
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 text-white font-black text-xs active:scale-95">
+          Save Station
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ALLOCATE COOK CREDENTIALS (Admin Only) -->
+  <div id="modal-staff" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <h3 id="modal-staff-title" class="font-black text-sm text-white">Allocate Cook Credentials</h3>
+        <button onclick="closeModal('modal-staff')" class="text-slate-400 text-sm">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveStaff(event)" class="space-y-2.5 text-xs">
+        <input type="hidden" id="edit-staff-id" />
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Cook Full Name *</label>
+          <input id="staff-name-input" required placeholder="e.g. Alexandre" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">Username *</label>
+            <input id="staff-user-input" required placeholder="alex.dough" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+          </div>
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">Password *</label>
+            <input id="staff-pass-input" required placeholder="Secret123" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+          </div>
+        </div>
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Assigned Station</label>
+          <select id="staff-station-input" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+            <!-- Dynamically populated -->
+          </select>
+        </div>
+        <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs active:scale-95 shadow">
+          Save Cook Profile
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- APPLICATION ENGINE JAVASCRIPT -->
+  <script>
+    // Pizzeria Initial Dataset
+    const DEFAULT_STATIONS = [
+      { id: 'st_dough', name: 'Dough & Fermentation', icon: '🍞' },
+      { id: 'st_sauce', name: 'Sauces & Marinara', icon: '🍅' },
+      { id: 'st_cheese', name: 'Cheese & Dairy Grating', icon: '🧀' },
+      { id: 'st_toppings', name: 'Toppings, Meats & Veg', icon: '🥩' },
+      { id: 'st_oven', name: 'Oven & Finish Line', icon: '🔥' }
+    ];
+
+    const DEFAULT_CATALOG = [
+      { id: 'cat_1', name: 'Neapolitan Dough Balls (260g)', stationId: 'st_dough', unit: 'portions', defaultTarget: 80, notes: '65% Hydration, proof 24h cold' },
+      { id: 'cat_2', name: 'San Marzano Pizza Sauce (Cooked)', stationId: 'st_sauce', unit: 'L', defaultTarget: 15, notes: 'Sea salt, oregano, fresh basil' },
+      { id: 'cat_3', name: 'Low-Moisture Mozzarella (Shredded)', stationId: 'st_cheese', unit: 'kg', defaultTarget: 20, notes: 'Keep below 4°C, diced medium shred' },
+      { id: 'cat_4', name: 'Fior Di Latte / Fresh Mozzarella', stationId: 'st_cheese', unit: 'kg', defaultTarget: 8, notes: 'Drained 2 hours before service' },
+      { id: 'cat_5', name: 'Sliced Pepperoni / Spicy Salami', stationId: 'st_toppings', unit: 'kg', defaultTarget: 6, notes: 'Portioned into 1kg cambros' },
+      { id: 'cat_6', name: 'Roasted Garlic & Herb Olive Oil', stationId: 'st_oven', unit: 'L', defaultTarget: 4, notes: 'Infused extra virgin olive oil' }
+    ];
+
+    const DEFAULT_USERS = [
+      { id: 'u_admin', username: 'chef.dan', password: 'admin123', name: 'Chef Dan', role: 'admin', stationId: 'all' },
+      { id: 'u_dough', username: 'alex.dough', password: 'cook123', name: 'Alexandre (Dough)', role: 'cook', stationId: 'st_dough' },
+      { id: 'u_sauce', username: 'elena.sauce', password: 'cook123', name: 'Elena (Sauce)', role: 'cook', stationId: 'st_sauce' },
+      { id: 'u_oven', username: 'carlos.oven', password: 'cook123', name: 'Carlos (Oven)', role: 'cook', stationId: 'st_oven' }
+    ];
+
+    // Master Application State
+    let appData = {
+      users: DEFAULT_USERS,
+      stations: DEFAULT_STATIONS,
+      catalog: DEFAULT_CATALOG,
+      dailyLogs: {},
+      firebaseConfig: ''
+    };
+
+    let currentUser = null;
+    let selectedDate = new Date().toISOString().split('T')[0];
+    let selectedStationFilter = 'all';
+
+    // State Persistence
+    function loadPersistedState() {
+      try {
+        const saved = localStorage.getItem('danops_pizzeria_db_v2');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.catalog && parsed.catalog.length > 0) {
+            appData = parsed;
+          }
+        }
+      } catch (err) {
+        console.warn('Initializing default dataset');
+      }
+    }
+
+    function persistState() {
+      localStorage.setItem('danops_pizzeria_db_v2', JSON.stringify(appData));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-msg');
+      toast.innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 2000);
+    }
+
+    function triggerManualSave() {
+      persistState();
+      showToast('💾 Prep Data Saved Successfully!');
+    }
+
+    // Authentication Workflow
+    function initAuth() {
+      loadPersistedState();
+
+      // Check URL parameters for direct private one-tap login (e.g. ?u=alex.dough&p=cook123)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlUser = urlParams.get('u');
+      const urlPass = urlParams.get('p');
+
+      if (urlUser && urlPass) {
+        const matched = appData.users.find(u => u.username === urlUser && u.password === urlPass);
+        if (matched) {
+          currentUser = matched;
+          finalizeLogin();
+          return;
+        }
+      }
+
+      // Check stored session
+      const storedUserId = localStorage.getItem('danops_session_uid');
+      if (storedUserId) {
+        const found = appData.users.find(u => u.id === storedUserId);
+        if (found) {
+          currentUser = found;
+          finalizeLogin();
+          return;
+        }
+      }
+
+      // Default to Login Overlay
+      document.getElementById('login-overlay').classList.remove('hidden');
+    }
+
+    function quickFillLogin(u, p) {
+      document.getElementById('login-username').value = u;
+      document.getElementById('login-password').value = p;
+    }
+
+    function handleUserLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('login-username').value.trim();
+      const p = document.getElementById('login-password').value.trim();
+
+      const matched = appData.users.find(user => user.username === u && user.password === p);
+      if (!matched) {
+        alert('Invalid credentials. Please verify your username and password.');
+        return;
+      }
+
+      currentUser = matched;
+      localStorage.setItem('danops_session_uid', currentUser.id);
+      finalizeLogin();
+    }
+
+    function finalizeLogin() {
+      document.getElementById('login-overlay').classList.add('hidden');
+      document.getElementById('user-greeting').innerText = `Logged in: ${currentUser.name}`;
+
+      const roleBadge = document.getElementById('user-role-badge');
+      const navStaff = document.getElementById('nav-staff');
+      const navStations = document.getElementById('nav-stations');
+      const navCloud = document.getElementById('nav-cloud');
+      const headerAddBtn = document.getElementById('header-add-item-btn');
+
+      if (currentUser.role === 'admin') {
+        roleBadge.innerText = 'HEAD CHEF (ADMIN)';
+        roleBadge.className = 'text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        navStaff.classList.remove('hidden');
+        navStations.classList.remove('hidden');
+        navCloud.classList.remove('hidden');
+        if (headerAddBtn) headerAddBtn.classList.remove('hidden');
+      } else {
+        roleBadge.innerText = `COOK (${currentUser.name})`;
+        roleBadge.className = 'text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30';
+        navStaff.classList.add('hidden');
+        navStations.classList.add('hidden');
+        navCloud.classList.add('hidden');
+        if (headerAddBtn) headerAddBtn.classList.add('hidden');
+      }
+
+      document.getElementById('selected-date-picker').value = selectedDate;
+      renderStationFilterStrip();
+      renderDailyPrepSheet();
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('danops_session_uid');
+      currentUser = null;
+      document.getElementById('login-overlay').classList.remove('hidden');
+    }
+
+    // Date Navigation
+    function navigateDay(delta) {
+      const d = new Date(selectedDate);
+      d.setDate(d.getDate() + delta);
+      selectedDate = d.toISOString().split('T')[0];
+      document.getElementById('selected-date-picker').value = selectedDate;
+      renderDailyPrepSheet();
+    }
+
+    function jumpToToday() {
+      selectedDate = new Date().toISOString().split('T')[0];
+      document.getElementById('selected-date-picker').value = selectedDate;
+      renderDailyPrepSheet();
+    }
+
+    function handleDatePickerChange(e) {
+      selectedDate = e.target.value;
+      renderDailyPrepSheet();
+    }
+
+    // Station Filters
+    function renderStationFilterStrip() {
+      const container = document.getElementById('station-filter-strip');
+      let html = `
+        <button onclick="setStationFilter('all')" class="px-2.5 py-1 rounded-xl whitespace-nowrap font-black text-xs ${selectedStationFilter === 'all' ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}">
+          All Stations
+        </button>
+      `;
+
+      appData.stations.forEach(st => {
+        const active = selectedStationFilter === st.id;
+        html += `
+          <button onclick="setStationFilter('${st.id}')" class="px-2.5 py-1 rounded-xl whitespace-nowrap font-black text-xs ${active ? 'bg-amber-500 text-slate-950' : 'bg-slate-900 border border-slate-800 text-slate-400'}">
+            ${st.icon || '🍕'} ${st.name}
+          </button>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function setStationFilter(stId) {
+      selectedStationFilter = stId;
+      renderStationFilterStrip();
+      renderDailyPrepSheet();
+    }
+
+    // DAILY PREP SHEET RENDERER (High-Density Row-by-Row Layout)
+    function renderDailyPrepSheet() {
+      const container = document.getElementById('daily-prep-container');
+      if (!appData.dailyLogs[selectedDate]) {
+        appData.dailyLogs[selectedDate] = {};
+      }
+
+      const dayRecord = appData.dailyLogs[selectedDate];
+
+      const visibleCatalog = appData.catalog.filter(cat => {
+        if (selectedStationFilter === 'all') return true;
+        return cat.stationId === selectedStationFilter;
+      });
+
+      if (visibleCatalog.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-8 bg-slate-900 border border-dashed border-slate-800 rounded-2xl p-4">
+            <span class="text-3xl block mb-1">🍕</span>
+            <p class="font-bold text-white text-xs">No catalog items assigned here</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">Items in the Master Catalog appear across all days automatically.</p>
+          </div>
+        `;
+        updateMetrics(0, 0, 0);
+        return;
+      }
+
+      let totalCount = 0;
+      let inProgressCount = 0;
+      let completedCount = 0;
+
+      let html = '';
+
+      visibleCatalog.forEach(item => {
+        totalCount++;
+
+        if (!dayRecord[item.id]) {
+          dayRecord[item.id] = {
+            target: item.defaultTarget || 0,
+            done: 0,
+            status: 'pending',
+            updatedBy: 'Not Started',
+            updatedTime: ''
+          };
+        }
+
+        const log = dayRecord[item.id];
+        const station = appData.stations.find(s => s.id === item.stationId);
+        const stName = station ? `${station.icon || '🍕'} ${station.name}` : 'General';
+
+        const isCompleted = log.target > 0 && log.done >= log.target;
+        if (isCompleted) completedCount++;
+        else if (log.done > 0) inProgressCount++;
+
+        const isAdmin = currentUser && currentUser.role === 'admin';
+
+        html += `
+          <div class="bg-slate-900 border ${isCompleted ? 'border-emerald-500/40 bg-slate-900/95' : 'border-slate-800'} rounded-xl p-2.5 flex flex-col gap-2">
+            
+            <!-- Top line: Station badge, Item name & Verification -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <span class="text-[9px] font-black text-amber-400 uppercase tracking-wider">${stName}</span>
+                <h3 class="text-xs font-black text-white leading-tight truncate">${item.name}</h3>
+                ${item.notes ? `<p class="text-[10px] text-slate-400 italic truncate">${item.notes}</p>` : ''}
+              </div>
+
+              <span class="text-[9px] font-black px-1.5 py-0.5 rounded-full border whitespace-nowrap ${
+                isCompleted 
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' 
+                  : (log.done > 0 ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-slate-800 text-slate-400 border-slate-700')
+              }">
+                ${isCompleted ? '✓ Done' : (log.done > 0 ? 'In Prog' : 'Pending')}
+              </span>
+            </div>
+
+            <!-- Quantitative Box: Allocated (Admin) vs Quantity Done (Cook) -->
+            <div class="grid grid-cols-2 gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800/80 items-center">
+              
+              <!-- ALLOCATED TARGET -->
+              <div>
+                <span class="text-[9px] text-slate-400 uppercase font-black block">Allocated Target</span>
+                <div class="flex items-center space-x-1 mt-0.5">
+                  ${isAdmin ? `
+                    <input 
+                      type="number" 
+                      step="any"
+                      value="${log.target}" 
+                      onchange="updateItemTarget('${item.id}', this.value)"
+                      class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-black text-amber-400 focus:border-amber-500 outline-none"
+                    />
+                  ` : `
+                    <span class="text-xs font-black text-amber-400">${log.target}</span>
+                  `}
+                  <span class="text-[10px] text-slate-400 font-semibold">${item.unit}</span>
+                </div>
+              </div>
+
+              <!-- QUANTITY DONE -->
+              <div>
+                <span class="text-[9px] text-emerald-400 uppercase font-black block">Quantity Done</span>
+                <div class="flex items-center space-x-1 mt-0.5">
+                  <input 
+                    type="number" 
+                    step="any"
+                    value="${log.done}" 
+                    onchange="updateItemDone('${item.id}', this.value)"
+                    class="w-16 bg-slate-900 border border-emerald-500/50 rounded px-1.5 py-0.5 text-xs font-black text-emerald-400 focus:border-emerald-400 outline-none"
+                  />
+                  <span class="text-[10px] text-slate-400 font-semibold">${item.unit}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Increment Buttons & Updated Signature -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-1">
+                <button onclick="incrementDone('${item.id}', 1)" class="px-2 py-0.5 text-[11px] font-black rounded bg-slate-800 text-slate-200 border border-slate-700 active:scale-95">
+                  +1
+                </button>
+                <button onclick="incrementDone('${item.id}', 5)" class="px-2 py-0.5 text-[11px] font-black rounded bg-slate-800 text-slate-200 border border-slate-700 active:scale-95">
+                  +5
+                </button>
+                <button onclick="markAllDone('${item.id}')" class="px-2 py-0.5 text-[11px] font-black rounded bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 active:scale-95">
+                  ✓ 100%
+                </button>
+              </div>
+
+              <span class="text-[9px] text-slate-500 truncate">
+                ${log.updatedBy ? `${log.updatedBy} ${log.updatedTime || ''}` : ''}
+              </span>
+            </div>
+
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+      updateMetrics(totalCount, inProgressCount, completedCount);
+    }
+
+    function updateMetrics(total, inProg, done) {
+      document.getElementById('stat-total').innerText = total;
+      document.getElementById('stat-inprogress').innerText = inProg;
+      document.getElementById('stat-done').innerText = done;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('stat-pace').innerText = pct + '%';
+    }
+
+    function updateItemTarget(itemId, val) {
+      const num = parseFloat(val) || 0;
+      if (!appData.dailyLogs[selectedDate]) appData.dailyLogs[selectedDate] = {};
+      if (!appData.dailyLogs[selectedDate][itemId]) {
+        appData.dailyLogs[selectedDate][itemId] = { target: num, done: 0, status: 'pending' };
+      }
+      const rec = appData.dailyLogs[selectedDate][itemId];
+      rec.target = num;
+      rec.updatedBy = currentUser ? currentUser.name : 'Admin';
+      rec.updatedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      persistState();
+      renderDailyPrepSheet();
+      showToast('Allocated Target Saved');
+    }
+
+    function updateItemDone(itemId, val) {
+      const num = Math.max(0, parseFloat(val) || 0);
+      if (!appData.dailyLogs[selectedDate]) appData.dailyLogs[selectedDate] = {};
+      if (!appData.dailyLogs[selectedDate][itemId]) {
+        appData.dailyLogs[selectedDate][itemId] = { target: 0, done: 0, status: 'pending' };
+      }
+      const rec = appData.dailyLogs[selectedDate][itemId];
+      rec.done = num;
+      rec.updatedBy = currentUser ? currentUser.name : 'Cook';
+      rec.updatedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      persistState();
+      renderDailyPrepSheet();
+      showToast('Quantity Done Saved');
+    }
+
+    function incrementDone(itemId, delta) {
+      const rec = appData.dailyLogs[selectedDate][itemId];
+      const cur = rec ? rec.done : 0;
+      updateItemDone(itemId, cur + delta);
+    }
+
+    function markAllDone(itemId) {
+      const rec = appData.dailyLogs[selectedDate][itemId];
+      if (rec && rec.target > 0) {
+        updateItemDone(itemId, rec.target);
+      } else {
+        alert('Please assign an allocated target greater than 0 first.');
+      }
+    }
+
+    // PRINT & EXPORT ENGINE (Direct System Print, PDF & Image PNG)
+    function buildPrintableTable() {
+      document.getElementById('print-doc-date').innerText = selectedDate;
+      document.getElementById('print-doc-time').innerText = new Date().toLocaleTimeString();
+
+      const tbody = document.getElementById('print-doc-table-body');
+      tbody.innerHTML = '';
+
+      if (!appData.dailyLogs[selectedDate]) appData.dailyLogs[selectedDate] = {};
+      const dayRecord = appData.dailyLogs[selectedDate];
+
+      let idx = 1;
+      appData.catalog.forEach(item => {
+        const log = dayRecord[item.id] || { target: item.defaultTarget || 0, done: 0 };
+        const st = appData.stations.find(s => s.id === item.stationId);
+        const stName = st ? st.name : 'General';
+        const isDone = log.target > 0 && log.done >= log.target;
+
+        const tr = document.createElement('tr');
+        tr.className = idx % 2 === 0 ? 'bg-slate-50' : 'bg-white';
+        tr.innerHTML = `
+          <td class="p-2 border border-slate-300 text-center font-bold">${idx++}</td>
+          <td class="p-2 border border-slate-300">
+            <strong>${item.name}</strong>
+            ${item.notes ? `<div style="font-size:10px; color:#666;">${item.notes}</div>` : ''}
+          </td>
+          <td class="p-2 border border-slate-300">${stName}</td>
+          <td class="p-2 border border-slate-300 text-center font-bold">${log.target} ${item.unit}</td>
+          <td class="p-2 border border-slate-300 text-center">${log.done} ${item.unit}</td>
+          <td class="p-2 border border-slate-300 text-center font-black ${isDone ? 'text-emerald-700' : 'text-slate-600'}">
+            ${isDone ? 'DONE' : 'PENDING'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openPrintModal() {
+      buildPrintableTable();
+      const clone = document.getElementById('print-kitchen-doc').cloneNode(true);
+      clone.style.display = 'block';
+      const container = document.getElementById('modal-print-preview-container');
+      container.innerHTML = '';
+      container.appendChild(clone);
+      document.getElementById('modal-print').classList.remove('hidden');
+    }
+
+    function executeSystemPrint() {
+      window.print();
+    }
+
+    function executePdfDownload() {
+      showToast('Generating PDF...');
+      const element = document.getElementById('print-kitchen-doc');
+      element.style.display = 'block';
+
+      html2canvas(element, { scale: 2 }).then(canvas => {
+        element.style.display = '';
+        const imgData = canvas.toDataURL('image/png');
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const imgWidth = 210;
+        const pageHeight = 295;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+        let heightLeft = imgHeight;
+        let position = 0;
+
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        pdf.save(`DanOps_Prep_${selectedDate}.pdf`);
+        showToast('📄 PDF Downloaded!');
+      }).catch(err => {
+        alert('Could not export PDF. Please use the Print option.');
+      });
+    }
+
+    function executeImageExport() {
+      showToast('Rendering Image...');
+      const element = document.getElementById('print-kitchen-doc');
+      element.style.display = 'block';
+
+      html2canvas(element, { scale: 2 }).then(canvas => {
+        element.style.display = '';
+        const link = document.createElement('a');
+        link.download = `DanOps_Prep_${selectedDate}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        showToast('🖼️ Image Saved to Device!');
+      }).catch(err => {
+        alert('Could not save image.');
+      });
+    }
+
+    // MASTER CATALOG MANAGEMENT
+    function renderMasterCatalog() {
+      const container = document.getElementById('master-catalog-list');
+      if (appData.catalog.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center border border-dashed border-slate-800 rounded-xl">Catalog is empty. Tap "+ New Item" to populate.</p>';
+        return;
+      }
+
+      container.innerHTML = appData.catalog.map(item => {
+        const st = appData.stations.find(s => s.id === item.stationId);
+        return `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
+            <div>
+              <span class="text-[9px] text-amber-400 font-bold uppercase">${st ? st.name : 'Unassigned'}</span>
+              <p class="text-xs font-bold text-white">${item.name}</p>
+              <p class="text-[10px] text-slate-400">Unit: <strong>${item.unit}</strong> • Default: ${item.defaultTarget || 0} ${item.unit}</p>
+            </div>
+            ${currentUser && currentUser.role === 'admin' ? `
+              <div class="flex items-center space-x-1">
+                <button onclick="openEditMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
+                <button onclick="deleteMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openMasterItemModal() {
+      document.getElementById('edit-item-id').value = '';
+      document.getElementById('item-name').value = '';
+      document.getElementById('item-default-target').value = '';
+      document.getElementById('item-notes').value = '';
+      populateStationDropdown('item-station');
+      document.getElementById('modal-item-title').innerText = 'Add Master Catalog Item';
+      document.getElementById('modal-master-item').classList.remove('hidden');
+    }
+
+    function openEditMasterItem(id) {
+      const item = appData.catalog.find(c => c.id === id);
+      if (!item) return;
+      document.getElementById('edit-item-id').value = item.id;
+      document.getElementById('item-name').value = item.name;
+      populateStationDropdown('item-station', item.stationId);
+      document.getElementById('item-unit').value = item.unit;
+      document.getElementById('item-default-target').value = item.defaultTarget || 0;
+      document.getElementById('item-notes').value = item.notes || '';
+      document.getElementById('modal-item-title').innerText = 'Edit Master Catalog Item';
+      document.getElementById('modal-master-item').classList.remove('hidden');
+    }
+
+    function handleSaveMasterItem(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-item-id').value;
+      const name = document.getElementById('item-name').value.trim();
+      const stationId = document.getElementById('item-station').value;
+      const unit = document.getElementById('item-unit').value;
+      const defaultTarget = parseFloat(document.getElementById('item-default-target').value) || 0;
+      const notes = document.getElementById('item-notes').value.trim();
+
+      if (id) {
+        const item = appData.catalog.find(c => c.id === id);
+        if (item) {
+          item.name = name; item.stationId = stationId; item.unit = unit;
+          item.defaultTarget = defaultTarget; item.notes = notes;
+        }
+      } else {
+        appData.catalog.push({
+          id: 'cat_' + Date.now(),
+          name, stationId, unit, defaultTarget, notes
+        });
+      }
+
+      closeModal('modal-master-item');
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Master Item Saved for All Days');
+    }
+
+    function deleteMasterItem(id) {
+      if (!confirm('Remove this item from the Master Catalog?')) return;
+      appData.catalog = appData.catalog.filter(c => c.id !== id);
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Item Removed');
+    }
+
+    // STATIONS MANAGEMENT
+    function renderStationsList() {
+      const container = document.getElementById('stations-list');
+      if (appData.stations.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-6 text-center border border-dashed border-slate-800 rounded-xl">No stations configured. Tap "+ Add Station".</p>';
+        return;
+      }
+
+      container.innerHTML = appData.stations.map(st => {
+        const count = appData.catalog.filter(c => c.stationId === st.id).length;
+        return `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <span class="text-xl">${st.icon || '🍕'}</span>
+              <div>
+                <p class="text-xs font-bold text-white">${st.name}</p>
+                <p class="text-[10px] text-slate-400">${count} catalog items assigned</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-1">
+              <button onclick="openEditStation('${st.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
+              <button onclick="deleteStation('${st.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openStationModal() {
+      document.getElementById('edit-station-id').value = '';
+      document.getElementById('station-name-input').value = '';
+      document.getElementById('station-icon-input').value = '🍕';
+      document.getElementById('modal-station-title').innerText = 'Add Station';
+      document.getElementById('modal-station').classList.remove('hidden');
+    }
+
+    function openEditStation(id) {
+      const st = appData.stations.find(s => s.id === id);
+      if (!st) return;
+      document.getElementById('edit-station-id').value = st.id;
+      document.getElementById('station-name-input').value = st.name;
+      document.getElementById('station-icon-input').value = st.icon || '🍕';
+      document.getElementById('modal-station-title').innerText = 'Edit Station';
+      document.getElementById('modal-station').classList.remove('hidden');
+    }
+
+    function handleSaveStation(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-station-id').value;
+      const name = document.getElementById('station-name-input').value.trim();
+      const icon = document.getElementById('station-icon-input').value.trim() || '🍕';
+
+      if (id) {
+        const st = appData.stations.find(s => s.id === id);
+        if (st) { st.name = name; st.icon = icon; }
+      } else {
+        appData.stations.push({ id: 'st_' + Date.now(), name, icon });
+      }
+
+      closeModal('modal-station');
+      persistState();
+      renderStationsList();
+      renderStationFilterStrip();
+      renderDailyPrepSheet();
+      showToast('Station Saved');
+    }
+
+    function deleteStation(id) {
+      if (!confirm('Delete this station?')) return;
+      appData.stations = appData.stations.filter(s => s.id !== id);
+      persistState();
+      renderStationsList();
+      renderStationFilterStrip();
+      renderDailyPrepSheet();
+      showToast('Station Deleted');
+    }
+
+    function deleteAllStations() {
+      if (!confirm('Warning: Delete ALL stations? You can add fresh ones anytime.')) return;
+      appData.stations = [];
+      persistState();
+      renderStationsList();
+      renderStationFilterStrip();
+      renderDailyPrepSheet();
+      showToast('All Stations Deleted');
+    }
+
+    function populateStationDropdown(elementId, selectedId = '') {
+      const sel = document.getElementById(elementId);
+      sel.innerHTML = appData.stations.map(st => `
+        <option value="${st.id}" ${st.id === selectedId ? 'selected' : ''}>
+          ${st.icon || '🍕'} ${st.name}
+        </option>
+      `).join('') || '<option value="">No Stations Available</option>';
+    }
+
+    // COOKS & PASSWORDS (Strict Admin Only)
+    function renderStaffList() {
+      const container = document.getElementById('staff-members-list');
+      container.innerHTML = appData.users.map(u => {
+        const isSelf = currentUser && currentUser.id === u.id;
+        const currentUrl = window.location.origin + window.location.pathname;
+        const privateLink = `${currentUrl}?u=${encodeURIComponent(u.username)}&p=${encodeURIComponent(u.password)}`;
+        const whatsappMsg = encodeURIComponent(`Hi ${u.name}, here is your DanOps Kitchen Prep access:\n${privateLink}`);
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
+
+        return `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${u.role === 'admin' ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300'}">
+                  ${u.role.toUpperCase()}
+                </span>
+                <p class="text-xs font-black text-white mt-0.5">${u.name}</p>
+              </div>
+              ${!isSelf ? `
+                <div class="flex items-center space-x-1">
+                  <button onclick="openEditStaff('${u.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
+                  <button onclick="deleteStaff('${u.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
+                </div>
+              ` : '<span class="text-[10px] text-amber-400 font-bold">(You)</span>'}
+            </div>
+
+            <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs font-mono flex justify-between">
+              <span class="text-slate-400">User: <strong class="text-slate-200">${u.username}</strong></span>
+              <span class="text-slate-400">Pass: <strong class="text-amber-400">${u.password}</strong></span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-1.5">
+              <button onclick="copyPrivateLink('${privateLink}')" class="py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center justify-center space-x-1 border border-slate-700 active:scale-95">
+                <span>🔗 Copy Link</span>
+              </button>
+              <a href="${whatsappUrl}" target="_blank" class="py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-[11px] font-bold flex items-center justify-center space-x-1 border border-emerald-500/30 active:scale-95 text-center">
+                <span>💬 WhatsApp</span>
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openStaffModal() {
+      document.getElementById('edit-staff-id').value = '';
+      document.getElementById('staff-name-input').value = '';
+      document.getElementById('staff-user-input').value = '';
+      document.getElementById('staff-pass-input').value = '';
+      populateStationDropdown('staff-station-input');
+      document.getElementById('modal-staff-title').innerText = 'Allocate Cook Credentials';
+      document.getElementById('modal-staff').classList.remove('hidden');
+    }
+
+    function openEditStaff(id) {
+      const u = appData.users.find(usr => usr.id === id);
+      if (!u) return;
+      document.getElementById('edit-staff-id').value = u.id;
+      document.getElementById('staff-name-input').value = u.name;
+      document.getElementById('staff-user-input').value = u.username;
+      document.getElementById('staff-pass-input').value = u.password;
+      populateStationDropdown('staff-station-input', u.stationId);
+      document.getElementById('modal-staff-title').innerText = 'Edit Cook Credentials';
+      document.getElementById('modal-staff').classList.remove('hidden');
+    }
+
+    function handleSaveStaff(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-staff-id').value;
+      const name = document.getElementById('staff-name-input').value.trim();
+      const username = document.getElementById('staff-user-input').value.trim();
+      const password = document.getElementById('staff-pass-input').value.trim();
+      const stationId = document.getElementById('staff-station-input').value;
+
+      if (id) {
+        const u = appData.users.find(usr => usr.id === id);
+        if (u) { u.name = name; u.username = username; u.password = password; u.stationId = stationId; }
+      } else {
+        appData.users.push({ id: 'u_' + Date.now(), name, username, password, stationId, role: 'cook' });
+      }
+
+      closeModal('modal-staff');
+      persistState();
+      renderStaffList();
+      showToast('Staff Saved');
+    }
+
+    function deleteStaff(id) {
+      if (!confirm('Remove this cook account?')) return;
+      appData.users = appData.users.filter(u => u.id !== id);
+      persistState();
+      renderStaffList();
+      showToast('Cook Removed');
+    }
+
+    function copyPrivateLink(link) {
+      navigator.clipboard.writeText(link).then(() => {
+        showToast('🔗 Private Link Copied!');
+      }).catch(() => {
+        prompt('Copy this link:', link);
+      });
+    }
+
+    // PRODUCTION ANALYTICS (Totals Till Date)
+    function renderAnalytics() {
+      const container = document.getElementById('analytics-summary-cards');
+      const range = document.getElementById('analytics-filter-range').value;
+
+      const totals = {};
+      appData.catalog.forEach(c => totals[c.id] = { name: c.name, unit: c.unit, done: 0, target: 0 });
+
+      const currentYearMonth = selectedDate.substring(0, 7);
+
+      Object.keys(appData.dailyLogs).forEach(dateKey => {
+        if (range === 'month' && !dateKey.startsWith(currentYearMonth)) return;
+        
+        const dayLogs = appData.dailyLogs[dateKey];
+        Object.keys(dayLogs).forEach(itemId => {
+          if (totals[itemId]) {
+            totals[itemId].done += dayLogs[itemId].done || 0;
+            totals[itemId].target += dayLogs[itemId].target || 0;
+          }
+        });
+      });
+
+      let html = '';
+      Object.keys(totals).forEach(itemId => {
+        const t = totals[itemId];
+        html += `
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-white">${t.name}</p>
+              <p class="text-[10px] text-slate-400">Total Prepped: <strong class="text-emerald-400">${t.done} ${t.unit}</strong> (Allocated: ${t.target} ${t.unit})</p>
+            </div>
+            <span class="text-[10px] font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-400">
+              ${t.target > 0 ? Math.round((t.done / t.target) * 100) : 0}%
+            </span>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // CLOUD & BACKUP
+    function exportBackupData() {
+      const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `DanOps_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+    }
+
+    function importBackupData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          appData = JSON.parse(evt.target.result);
+          persistState();
+          renderDailyPrepSheet();
+          renderMasterCatalog();
+          renderStationsList();
+          showToast('Backup Restored Successfully!');
+        } catch(err) {
+          alert('Could not restore backup file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function saveFirebaseConfig() {
+      const val = document.getElementById('firebase-config-input').value.trim();
+      appData.firebaseConfig = val;
+      persistState();
+      showToast('Cloud Config Stored');
+    }
+
+    // TAB CONTROLLER
+    function switchTab(tabId) {
+      if ((tabId === 'staff' || tabId === 'stations' || tabId === 'cloud') && (!currentUser || currentUser.role !== 'admin')) {
+        alert('Access Restricted: Only the Head Chef (Admin) can access this section.');
+        return;
+      }
+
+      ['daily-prep', 'master-catalog', 'stations', 'analytics', 'staff', 'cloud'].forEach(t => {
+        const el = document.getElementById('tab-' + t);
+        const nav = document.getElementById('nav-' + t);
+        if (el) el.classList.add('hidden');
+        if (nav) nav.className = 'flex flex-col items-center py-1 px-2 text-slate-400 font-medium';
+      });
+
+      const activeEl = document.getElementById('tab-' + tabId);
+      const activeNav = document.getElementById('nav-' + tabId);
+      if (activeEl) activeEl.classList.remove('hidden');
+      if (activeNav) activeNav.className = 'flex flex-col items-center py-1 px-2 text-amber-400 font-black';
+
+      if (tabId === 'daily-prep') renderDailyPrepSheet();
+      if (tabId === 'master-catalog') renderMasterCatalog();
+      if (tabId === 'stations') renderStationsList();
+      if (tabId === 'analytics') renderAnalytics();
+      if (tabId === 'staff') renderStaffList();
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // Application Lifecycle
+    window.addEventListener('DOMContentLoaded', () => {
+      initAuth();
+    });
+  </script>
+</body>
+</html>
