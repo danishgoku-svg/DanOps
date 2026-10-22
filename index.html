@@ -16,6 +16,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+  <!-- Firebase App & Firestore SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
     body {
@@ -157,6 +161,8 @@
         </div>
 
         <div class="flex items-center space-x-1.5">
+          <!-- Real-Time Sync Indicator Dot -->
+          <div id="cloud-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-600 mr-1" title="Offline / Local only"></div>
           <button onclick="handleLogout()" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95">
             Sign Out
           </button>
@@ -279,11 +285,14 @@
         <h2 class="text-sm font-black text-white">Cloud Sync & Data Backup</h2>
         
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
-          <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Multi-Device Cloud Sync (Firebase)</span>
-          <p class="text-xs text-slate-400">To sync all items and numbers in real time across every cook's phone, paste your free Google Firebase config JSON below.</p>
-          <textarea id="firebase-config-input" rows="3" placeholder='{"apiKey": "...", "projectId": "..."}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-300 outline-none"></textarea>
-          <button onclick="saveFirebaseConfig()" class="w-full py-2 rounded-lg bg-emerald-600 text-white font-bold text-xs active:scale-95 shadow">
-            Save Cloud Connection
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live Cloud Sync (Firebase)</span>
+            <span id="cloud-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">Not Connected</span>
+          </div>
+          <p class="text-xs text-slate-400">Paste your Firebase Config snippet below to sync all devices in real-time:</p>
+          <textarea id="firebase-config-input" rows="4" placeholder='{"apiKey": "...", "projectId": "..."}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-300 outline-none"></textarea>
+          <button onclick="saveAndConnectFirebase()" class="w-full py-2 rounded-lg bg-emerald-600 text-white font-bold text-xs active:scale-95 shadow">
+            Connect & Start Live Sync
           </button>
         </div>
 
@@ -461,6 +470,8 @@
 
     let currentUser = null;
     let selectedDate = new Date().toISOString().split('T')[0];
+    let db = null;
+    let isRemoteUpdate = false;
 
     // Local Storage Persistence
     function loadPersistedState() {
@@ -488,6 +499,7 @@
       } catch (e) {
         console.error('Storage full or unavailable', e);
       }
+      syncToFirestore();
     }
 
     function showToast(msg) {
@@ -499,10 +511,113 @@
 
     function triggerManualSave() {
       persistState();
-      showToast('💾 All Data Saved Locally!');
+      showToast('💾 Saved Successfully!');
     }
 
-    // Authentication Workflow with Self-Healing Registration Link
+    // FIREBASE REAL-TIME SYNC ENGINE
+    function initFirebase() {
+      if (!appData.firebaseConfig) return;
+
+      try {
+        let configObj = null;
+        if (typeof appData.firebaseConfig === 'string') {
+          // Parse JSON or JS object formatting
+          let sanitized = appData.firebaseConfig.trim();
+          if (!sanitized.startsWith('{')) {
+            const start = sanitized.indexOf('{');
+            const end = sanitized.lastIndexOf('}');
+            if (start !== -1 && end !== -1) {
+              sanitized = sanitized.substring(start, end + 1);
+            }
+          }
+          try {
+            configObj = JSON.parse(sanitized);
+          } catch (e) {
+            // Support unquoted key format
+            configObj = new Function('return ' + sanitized)();
+          }
+        } else {
+          configObj = appData.firebaseConfig;
+        }
+
+        if (!configObj || !configObj.projectId) return;
+
+        if (!firebase.apps.length) {
+          firebase.initializeApp(configObj);
+        }
+        db = firebase.firestore();
+
+        // Update UI status
+        const dot = document.getElementById('cloud-status-dot');
+        const badge = document.getElementById('cloud-status-badge');
+        if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse mr-1';
+        if (badge) {
+          badge.innerText = 'Connected & Syncing Live';
+          badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
+        }
+
+        // Attach Real-Time Document Listener
+        db.collection('danops').doc('live_kitchen').onSnapshot(doc => {
+          if (doc.exists) {
+            const remoteData = doc.data();
+            if (remoteData && remoteData.catalog) {
+              isRemoteUpdate = true;
+              appData.catalog = remoteData.catalog || [];
+              appData.dailyLogs = remoteData.dailyLogs || {};
+              if (Array.isArray(remoteData.users) && remoteData.users.length > 0) {
+                // Merge users to preserve local sessions
+                remoteData.users.forEach(ru => {
+                  if (!appData.users.some(lu => lu.username.toLowerCase() === ru.username.toLowerCase())) {
+                    appData.users.push(ru);
+                  }
+                });
+              }
+              localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
+              renderDailyPrepSheet();
+              renderMasterCatalog();
+              renderStaffList();
+              isRemoteUpdate = false;
+            }
+          } else {
+            // First time setup: push current data up
+            syncToFirestore(true);
+          }
+        }, err => {
+          console.warn('Firestore snapshot error:', err);
+        });
+
+      } catch (err) {
+        console.error('Firebase setup failed:', err);
+      }
+    }
+
+    function syncToFirestore(force = false) {
+      if (!db || (isRemoteUpdate && !force)) return;
+
+      db.collection('danops').doc('live_kitchen').set({
+        catalog: appData.catalog,
+        dailyLogs: appData.dailyLogs,
+        users: appData.users,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => {
+        console.warn('Sync push error:', err);
+      });
+    }
+
+    function saveAndConnectFirebase() {
+      const input = document.getElementById('firebase-config-input').value.trim();
+      if (!input) {
+        alert('Please paste your Firebase configuration snippet first.');
+        return;
+      }
+
+      appData.firebaseConfig = input;
+      localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
+      initFirebase();
+      showToast('☁️ Live Cloud Sync Connected!');
+    }
+
+    // Authentication Workflow with Self-Healing Links
     function initAuth() {
       loadPersistedState();
 
@@ -511,8 +626,17 @@
       const urlPass = urlParams.get('p');
       const urlName = urlParams.get('n');
       const urlRole = urlParams.get('r') || 'cook';
+      const urlFb = urlParams.get('fb');
 
-      // If user arrives via WhatsApp link with credentials, register or update their account immediately
+      // Auto-import firebase config if forwarded in URL
+      if (urlFb) {
+        try {
+          appData.firebaseConfig = decodeURIComponent(urlFb);
+          localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
+        } catch(e){}
+      }
+
+      // Auto-register via private URL
       if (urlUser && urlPass) {
         let matched = appData.users.find(u => u.username.toLowerCase() === urlUser.toLowerCase());
         if (!matched) {
@@ -597,6 +721,7 @@
 
       document.getElementById('selected-date-picker').value = selectedDate;
       renderDailyPrepSheet();
+      initFirebase();
     }
 
     function handleLogout() {
@@ -864,6 +989,7 @@
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p', 'mm', 'a4');
         const imgWidth = 210;
+        const pageHeight = 295;
         const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
         pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
@@ -965,7 +1091,7 @@
       persistState();
       renderMasterCatalog();
       renderDailyPrepSheet();
-      showToast('Item Saved Forever');
+      showToast('Item Saved');
     }
 
     function deleteMasterItem(id) {
@@ -977,15 +1103,19 @@
       showToast('Item Deleted');
     }
 
-    // USERS & PASSWORDS (With One-Tap Staff Auto-Enrollment Links)
+    // USERS & PASSWORDS (With One-Tap Auto-Enrollment & Cloud Config forwarding)
     function renderStaffList() {
       const container = document.getElementById('staff-members-list');
       container.innerHTML = appData.users.map(u => {
         const isSelf = currentUser && currentUser.id === u.id;
         const currentUrl = window.location.origin + window.location.pathname;
         
-        // Pass name, user, pass, and role so cook's phone auto-registers without database
-        const privateLink = `${currentUrl}?u=${encodeURIComponent(u.username)}&p=${encodeURIComponent(u.password)}&n=${encodeURIComponent(u.name)}&r=${u.role}`;
+        let linkParams = `u=${encodeURIComponent(u.username)}&p=${encodeURIComponent(u.password)}&n=${encodeURIComponent(u.name)}&r=${u.role}`;
+        if (appData.firebaseConfig) {
+          linkParams += `&fb=${encodeURIComponent(appData.firebaseConfig)}`;
+        }
+
+        const privateLink = `${currentUrl}?${linkParams}`;
         const whatsappMsg = encodeURIComponent(`Hi ${u.name}, here is your DanOps Kitchen Prep access:\n${privateLink}`);
         const whatsappUrl = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
 
@@ -1131,7 +1261,7 @@
       container.innerHTML = html || '<p class="text-xs text-slate-500 text-center py-6">No prep logs recorded yet.</p>';
     }
 
-    // CLOUD & BACKUP
+    // BACKUP
     function exportBackupData() {
       const blob = new Blob([JSON.stringify(appData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1159,13 +1289,6 @@
       reader.readAsText(file);
     }
 
-    function saveFirebaseConfig() {
-      const val = document.getElementById('firebase-config-input').value.trim();
-      appData.firebaseConfig = val;
-      persistState();
-      showToast('Cloud Config Stored');
-    }
-
     // TABS
     function switchTab(tabId) {
       if ((tabId === 'staff' || tabId === 'cloud') && (!currentUser || currentUser.role !== 'admin')) {
@@ -1189,6 +1312,9 @@
       if (tabId === 'master-catalog') renderMasterCatalog();
       if (tabId === 'analytics') renderAnalytics();
       if (tabId === 'staff') renderStaffList();
+      if (tabId === 'cloud' && appData.firebaseConfig) {
+        document.getElementById('firebase-config-input').value = appData.firebaseConfig;
+      }
     }
 
     function closeModal(id) {
