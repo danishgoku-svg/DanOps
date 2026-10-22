@@ -1,16 +1,13 @@
 {
-  "id": "/DanOps/",
-  "name": "DanOps - Pizzeria Operations",
+  "name": "DanOps",
   "short_name": "DanOps",
   "start_url": "/DanOps/",
-  "scope": "/DanOps/",
   "display": "standalone",
   "background_color": "#0b0f17",
   "theme_color": "#0b0f17",
-  "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/3595/3595458.png",
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
