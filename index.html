@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>DanOps – Pizzeria Operations</title>
   <link rel="manifest" href="/DanOps/manifest.json" />
-  
 
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1244,12 +1243,12 @@
                 </span>
                 <p class="text-xs font-black text-white mt-0.5">${u.name}</p>
               </div>
-              ${!isSelf ? `
-                <div class="flex items-center space-x-1">
-                  <button onclick="openEditStaff('${u.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
-                  <button onclick="deleteStaff('${u.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
-                </div>
-              ` : '<span class="text-[10px] text-amber-400 font-bold">(You)</span>'}
+              <div class="flex items-center space-x-1">
+                <button onclick="openEditStaff('${u.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95" title="Edit Profile">✏️</button>
+                ${!isSelf ? `
+                  <button onclick="deleteStaff('${u.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95" title="Remove Account">🗑️</button>
+                ` : '<span class="text-[10px] text-amber-400 font-bold ml-1">(You)</span>'}
+              </div>
             </div>
 
             <div class="bg-slate-950 p-2 rounded-lg border border-slate-800 text-xs font-mono flex justify-between">
@@ -1288,7 +1287,7 @@
       document.getElementById('staff-user-input').value = u.username;
       document.getElementById('staff-pass-input').value = u.password;
       populateStationDropdown('staff-station-input', u.stationId);
-      document.getElementById('modal-staff-title').innerText = 'Edit Cook Credentials';
+      document.getElementById('modal-staff-title').innerText = u.role === 'admin' ? 'Edit Admin Profile' : 'Edit Cook Credentials';
       document.getElementById('modal-staff').classList.remove('hidden');
     }
 
@@ -1302,7 +1301,20 @@
 
       if (id) {
         const u = appData.users.find(usr => usr.id === id);
-        if (u) { u.name = name; u.username = username; u.password = password; u.stationId = stationId; }
+        if (u) {
+          u.name = name;
+          u.username = username;
+          u.password = password;
+          if (u.role !== 'admin') {
+            u.stationId = stationId;
+          }
+          if (currentUser && currentUser.id === u.id) {
+            currentUser.name = name;
+            currentUser.username = username;
+            currentUser.password = password;
+            document.getElementById('user-greeting').innerText = `Logged in: ${name}`;
+          }
+        }
       } else {
         appData.users.push({ id: 'u_' + Date.now(), name, username, password, stationId, role: 'cook' });
       }
@@ -1310,7 +1322,7 @@
       closeModal('modal-staff');
       persistState();
       renderStaffList();
-      showToast('Staff Saved');
+      showToast('Profile Saved');
     }
 
     function deleteStaff(id) {
