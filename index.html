@@ -256,7 +256,23 @@
         </div>
       </section>
 
-      <!-- TAB 3: PRODUCTION TOTALS -->
+      <!-- TAB 3: RECIPES & PREP SPECS (ALL USERS VIEW, ADMIN EDITS) -->
+      <section id="tab-recipes" class="hidden space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-black text-white">Kitchen Recipes & SOPs</h2>
+            <p class="text-[10px] text-slate-400">Tap any photo to zoom in</p>
+          </div>
+          <button id="admin-add-recipe-btn" onclick="openRecipeModal()" class="px-2.5 py-1 text-xs font-black rounded-lg bg-amber-500 text-slate-950">
+            + Add Recipe
+          </button>
+        </div>
+
+        <div id="recipes-list-container" class="space-y-3">
+        </div>
+      </section>
+
+      <!-- TAB 4: PRODUCTION TOTALS -->
       <section id="tab-analytics" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -274,7 +290,7 @@
         </div>
       </section>
 
-      <!-- TAB 4: USERS & PASSWORDS (Admin Only) -->
+      <!-- TAB 5: USERS & PASSWORDS (Admin Only) -->
       <section id="tab-staff" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -290,7 +306,7 @@
         </div>
       </section>
 
-      <!-- TAB 5: CLOUD & BACKUP -->
+      <!-- TAB 6: CLOUD & BACKUP -->
       <section id="tab-cloud" class="hidden space-y-2.5">
         <h2 class="text-sm font-black text-white">Cloud Sync & Data Backup</h2>
         
@@ -320,31 +336,97 @@
 
     <!-- FLOATING BOTTOM NAVIGATION BAR -->
     <nav class="fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 max-w-xl mx-auto px-1 py-1.5 flex items-center justify-around no-print">
-      <button onclick="switchTab('daily-prep')" id="nav-daily-prep" class="flex flex-col items-center py-1 px-2.5 text-amber-400 font-black">
+      <button onclick="switchTab('daily-prep')" id="nav-daily-prep" class="flex flex-col items-center py-1 px-2 text-amber-400 font-black">
         <span class="text-base">📋</span>
         <span class="text-[9px] mt-0.5">Prep</span>
       </button>
 
-      <button onclick="switchTab('master-catalog')" id="nav-master-catalog" class="flex flex-col items-center py-1 px-2.5 text-slate-400 font-medium">
+      <button onclick="switchTab('master-catalog')" id="nav-master-catalog" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
         <span class="text-base">📦</span>
         <span class="text-[9px] mt-0.5">Items</span>
       </button>
 
-      <button onclick="switchTab('analytics')" id="nav-analytics" class="flex flex-col items-center py-1 px-2.5 text-slate-400 font-medium">
+      <button onclick="switchTab('recipes')" id="nav-recipes" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
+        <span class="text-base">📖</span>
+        <span class="text-[9px] mt-0.5">Recipes</span>
+      </button>
+
+      <button onclick="switchTab('analytics')" id="nav-analytics" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
         <span class="text-base">📊</span>
         <span class="text-[9px] mt-0.5">Totals</span>
       </button>
 
-      <button onclick="switchTab('staff')" id="nav-staff" class="flex flex-col items-center py-1 px-2.5 text-slate-400 font-medium">
+      <button onclick="switchTab('staff')" id="nav-staff" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
         <span class="text-base">👥</span>
         <span class="text-[9px] mt-0.5">Accounts</span>
       </button>
 
-      <button onclick="switchTab('cloud')" id="nav-cloud" class="flex flex-col items-center py-1 px-2.5 text-slate-400 font-medium">
+      <button onclick="switchTab('cloud')" id="nav-cloud" class="flex flex-col items-center py-1 px-2 text-slate-400 font-medium">
         <span class="text-base">☁️</span>
         <span class="text-[9px] mt-0.5">Cloud</span>
       </button>
     </nav>
+  </div>
+
+  <!-- MODAL: ADD / EDIT RECIPE (Admin Only for Save/Update) -->
+  <div id="modal-recipe" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
+    <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+        <h3 id="modal-recipe-title" class="font-black text-sm text-white">Add Recipe Card</h3>
+        <button onclick="closeModal('modal-recipe')" class="text-slate-400 text-sm">✕</button>
+      </div>
+
+      <form onsubmit="handleSaveRecipe(event)" class="space-y-2.5 text-xs flex-1 overflow-y-auto">
+        <input type="hidden" id="edit-recipe-id" />
+        <input type="hidden" id="recipe-photo-base64" />
+        
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Recipe / Item Name *</label>
+          <input id="recipe-name-input" required placeholder="e.g. Classic Pizza Sauce" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Category / Section</label>
+          <input id="recipe-category-input" placeholder="e.g. Sauces, Dough, Prep, Sides" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none" />
+        </div>
+
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Recipe Card Photo (Any Size from Phone)</label>
+          <div class="flex items-center space-x-2">
+            <label class="flex-1 py-2 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold text-center cursor-pointer flex items-center justify-center space-x-1 active:scale-95">
+              <span>📷 Select / Capture Photo</span>
+              <input type="file" accept="image/*" onchange="handleProcessRecipeImage(event)" class="hidden" />
+            </label>
+          </div>
+          <div id="recipe-photo-preview-wrap" class="mt-2 hidden">
+            <img id="recipe-photo-preview" src="" alt="Recipe Preview" class="w-full h-36 object-cover rounded-xl border border-slate-700" />
+          </div>
+        </div>
+
+        <div>
+          <label class="text-slate-400 font-bold block mb-1">Quick Instructions / Ingredients Specs</label>
+          <textarea id="recipe-instructions-input" rows="3" placeholder="Step-by-step or measurement specs..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:border-amber-500 outline-none"></textarea>
+        </div>
+
+        <button type="submit" id="btn-save-recipe" class="w-full py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs active:scale-95 shadow">
+          Save Recipe
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- HIDDEN INPUT FOR QUICK PHOTO UPDATE -->
+  <input type="file" id="quick-photo-input" accept="image/*" class="hidden" onchange="handleExecuteQuickPhotoUpdate(event)" />
+
+  <!-- MODAL: FULLSCREEN RECIPE IMAGE VIEWER (For Cooks & Admin) -->
+  <div id="modal-lightbox" class="hidden fixed inset-0 z-50 bg-black/95 flex flex-col p-3 no-print" onclick="closeModal('modal-lightbox')">
+    <div class="flex justify-between items-center text-white pb-2">
+      <span id="lightbox-title" class="text-sm font-bold truncate">Recipe Card</span>
+      <button class="text-lg p-2 text-slate-400 hover:text-white">✕</button>
+    </div>
+    <div class="flex-1 flex items-center justify-center overflow-auto">
+      <img id="lightbox-img" src="" alt="Full Recipe" class="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+    </div>
   </div>
 
   <!-- MODAL: PRINT PREVIEW -->
@@ -490,6 +572,7 @@
     let appData = {
       users: DEFAULT_USERS,
       catalog: DEFAULT_CATALOG,
+      recipes: [],
       dailyLogs: {}
     };
 
@@ -498,6 +581,7 @@
     let db = null;
     let isRemoteUpdate = false;
     let draggedItemIndex = null;
+    let updatingRecipeId = null;
 
     function loadPersistedState() {
       try {
@@ -507,6 +591,7 @@
           appData = {
             users: Array.isArray(parsed.users) && parsed.users.length > 0 ? parsed.users : DEFAULT_USERS,
             catalog: Array.isArray(parsed.catalog) ? parsed.catalog : [],
+            recipes: Array.isArray(parsed.recipes) ? parsed.recipes : [],
             dailyLogs: parsed.dailyLogs || {}
           };
         } else {
@@ -554,9 +639,10 @@
         db.collection('danops').doc('live_kitchen').onSnapshot(doc => {
           if (doc.exists) {
             const remoteData = doc.data();
-            if (remoteData && remoteData.catalog) {
+            if (remoteData) {
               isRemoteUpdate = true;
               appData.catalog = remoteData.catalog || [];
+              appData.recipes = remoteData.recipes || [];
               appData.dailyLogs = remoteData.dailyLogs || {};
               if (Array.isArray(remoteData.users) && remoteData.users.length > 0) {
                 remoteData.users.forEach(ru => {
@@ -568,6 +654,7 @@
               localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
               renderDailyPrepSheet();
               renderMasterCatalog();
+              renderRecipesList();
               renderStaffList();
               isRemoteUpdate = false;
             }
@@ -588,6 +675,7 @@
 
       db.collection('danops').doc('live_kitchen').set({
         catalog: appData.catalog,
+        recipes: appData.recipes,
         dailyLogs: appData.dailyLogs,
         users: appData.users,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -672,6 +760,7 @@
       const navStaff = document.getElementById('nav-staff');
       const navCloud = document.getElementById('nav-cloud');
       const headerAddBtn = document.getElementById('header-add-item-btn');
+      const adminAddRecipeBtn = document.getElementById('admin-add-recipe-btn');
 
       if (currentUser.role === 'admin') {
         roleBadge.innerText = 'HEAD CHEF (ADMIN)';
@@ -679,16 +768,19 @@
         navStaff.classList.remove('hidden');
         navCloud.classList.remove('hidden');
         if (headerAddBtn) headerAddBtn.classList.remove('hidden');
+        if (adminAddRecipeBtn) adminAddRecipeBtn.classList.remove('hidden');
       } else {
         roleBadge.innerText = `STAFF (${currentUser.name})`;
         roleBadge.className = 'text-[9px] uppercase font-black px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30';
         navStaff.classList.add('hidden');
         navCloud.classList.add('hidden');
         if (headerAddBtn) headerAddBtn.classList.add('hidden');
+        if (adminAddRecipeBtn) adminAddRecipeBtn.classList.add('hidden');
       }
 
       document.getElementById('selected-date-picker').value = selectedDate;
       renderDailyPrepSheet();
+      renderRecipesList();
       initFirebase();
     }
 
@@ -1091,6 +1183,240 @@
       showToast('Item Deleted');
     }
 
+    // ----------------------------------------------------
+    // RECIPES & PHOTO MANAGEMENT
+    // ----------------------------------------------------
+    function compressImageFile(file, maxWidth = 1200, maxHeight = 1200, quality = 0.75) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          const img = new Image();
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxWidth) {
+                height = Math.round((height * maxWidth) / width);
+                width = maxWidth;
+              }
+            } else {
+              if (height > maxHeight) {
+                width = Math.round((width * maxHeight) / height);
+                height = maxHeight;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            resolve(dataUrl);
+          };
+          img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+      });
+    }
+
+    async function handleProcessRecipeImage(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      showToast('Optimizing photo...');
+      try {
+        const compressedBase64 = await compressImageFile(file);
+        document.getElementById('recipe-photo-base64').value = compressedBase64;
+        const preview = document.getElementById('recipe-photo-preview');
+        preview.src = compressedBase64;
+        document.getElementById('recipe-photo-preview-wrap').classList.remove('hidden');
+        showToast('Photo Loaded');
+      } catch (err) {
+        alert('Could not process this image. Please try again.');
+      }
+    }
+
+    function triggerQuickPhotoUpdate(recipeId) {
+      updatingRecipeId = recipeId;
+      document.getElementById('quick-photo-input').click();
+    }
+
+    async function handleExecuteQuickPhotoUpdate(e) {
+      const file = e.target.files[0];
+      if (!file || !updatingRecipeId) return;
+
+      showToast('Updating recipe photo...');
+      try {
+        const compressedBase64 = await compressImageFile(file);
+        const recipe = appData.recipes.find(r => r.id === updatingRecipeId);
+        if (recipe) {
+          recipe.photo = compressedBase64;
+          recipe.updatedAt = new Date().toLocaleDateString();
+          persistState();
+          renderRecipesList();
+          showToast('Photo Updated Successfully!');
+        }
+      } catch (err) {
+        alert('Could not update image.');
+      } finally {
+        updatingRecipeId = null;
+        e.target.value = '';
+      }
+    }
+
+    function openRecipeModal() {
+      document.getElementById('edit-recipe-id').value = '';
+      document.getElementById('recipe-photo-base64').value = '';
+      document.getElementById('recipe-name-input').value = '';
+      document.getElementById('recipe-category-input').value = '';
+      document.getElementById('recipe-instructions-input').value = '';
+      document.getElementById('recipe-photo-preview').src = '';
+      document.getElementById('recipe-photo-preview-wrap').classList.add('hidden');
+      document.getElementById('modal-recipe-title').innerText = 'Add Recipe Card';
+      document.getElementById('modal-recipe').classList.remove('hidden');
+    }
+
+    function openEditRecipe(id) {
+      const rec = appData.recipes.find(r => r.id === id);
+      if (!rec) return;
+
+      document.getElementById('edit-recipe-id').value = rec.id;
+      document.getElementById('recipe-photo-base64').value = rec.photo || '';
+      document.getElementById('recipe-name-input').value = rec.name;
+      document.getElementById('recipe-category-input').value = rec.category || '';
+      document.getElementById('recipe-instructions-input').value = rec.instructions || '';
+      
+      const preview = document.getElementById('recipe-photo-preview');
+      if (rec.photo) {
+        preview.src = rec.photo;
+        document.getElementById('recipe-photo-preview-wrap').classList.remove('hidden');
+      } else {
+        preview.src = '';
+        document.getElementById('recipe-photo-preview-wrap').classList.add('hidden');
+      }
+
+      document.getElementById('modal-recipe-title').innerText = 'Edit Recipe Card';
+      document.getElementById('modal-recipe').classList.remove('hidden');
+    }
+
+    function handleSaveRecipe(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-recipe-id').value;
+      const name = document.getElementById('recipe-name-input').value.trim();
+      const category = document.getElementById('recipe-category-input').value.trim() || 'General';
+      const instructions = document.getElementById('recipe-instructions-input').value.trim();
+      const photo = document.getElementById('recipe-photo-base64').value;
+
+      if (!appData.recipes) appData.recipes = [];
+
+      if (id) {
+        const recipe = appData.recipes.find(r => r.id === id);
+        if (recipe) {
+          recipe.name = name;
+          recipe.category = category;
+          recipe.instructions = instructions;
+          if (photo) recipe.photo = photo;
+          recipe.updatedAt = new Date().toLocaleDateString();
+        }
+      } else {
+        appData.recipes.unshift({
+          id: 'rec_' + Date.now(),
+          name,
+          category,
+          instructions,
+          photo: photo || '',
+          updatedAt: new Date().toLocaleDateString()
+        });
+      }
+
+      closeModal('modal-recipe');
+      persistState();
+      renderRecipesList();
+      showToast('Recipe Saved');
+    }
+
+    function deleteRecipe(id) {
+      if (!confirm('Permanently delete this recipe?')) return;
+      appData.recipes = appData.recipes.filter(r => r.id !== id);
+      persistState();
+      renderRecipesList();
+      showToast('Recipe Deleted');
+    }
+
+    function renderRecipesList() {
+      const container = document.getElementById('recipes-list-container');
+      if (!appData.recipes || appData.recipes.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-slate-900 border border-dashed border-slate-800 rounded-2xl p-6">
+            <span class="text-4xl block mb-2">📖</span>
+            <p class="font-bold text-white text-sm">No recipes added yet</p>
+            <p class="text-xs text-slate-400 mt-1">Head Chef can upload recipe photos and prep specs.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const isAdmin = currentUser && currentUser.role === 'admin';
+
+      container.innerHTML = appData.recipes.map(recipe => {
+        return `
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-md">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[9px] uppercase font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  ${recipe.category}
+                </span>
+                <h3 class="text-sm font-black text-white mt-1">${recipe.name}</h3>
+              </div>
+              ${isAdmin ? `
+                <div class="flex items-center space-x-1.5">
+                  <button onclick="triggerQuickPhotoUpdate('${recipe.id}')" class="px-2 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30 active:scale-95 flex items-center gap-1">
+                    <span>📷</span>
+                    <span>Update Photo</span>
+                  </button>
+                  <button onclick="openEditRecipe('${recipe.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95" title="Edit">✏️</button>
+                  <button onclick="deleteRecipe('${recipe.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95" title="Delete">🗑️</button>
+                </div>
+              ` : ''}
+            </div>
+
+            ${recipe.photo ? `
+              <div class="relative group cursor-pointer" onclick="openLightbox('${recipe.photo}', '${recipe.name}')">
+                <img src="${recipe.photo}" alt="${recipe.name}" class="w-full h-44 object-cover rounded-xl border border-slate-800" />
+                <div class="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded-md text-[9px] text-white flex items-center gap-1 font-semibold">
+                  <span>🔍</span> Tap to view full size
+                </div>
+              </div>
+            ` : `
+              <div class="bg-slate-950/80 border border-dashed border-slate-800 rounded-xl p-4 text-center text-xs text-slate-500">
+                No recipe photo attached
+              </div>
+            `}
+
+            ${recipe.instructions ? `
+              <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                ${recipe.instructions}
+              </div>
+            ` : ''}
+
+            <div class="text-[9px] text-slate-500 text-right">
+              Last updated: ${recipe.updatedAt || 'Recent'}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openLightbox(photoUrl, title) {
+      document.getElementById('lightbox-img').src = photoUrl;
+      document.getElementById('lightbox-title').innerText = title || 'Recipe Card';
+      document.getElementById('modal-lightbox').classList.remove('hidden');
+    }
+
     // PRINT & EXPORT
     function buildPrintableTable() {
       document.getElementById('print-doc-date').innerText = selectedDate;
@@ -1352,6 +1678,7 @@
           persistState();
           renderDailyPrepSheet();
           renderMasterCatalog();
+          renderRecipesList();
           showToast('Backup Restored Successfully!');
         } catch(err) {
           alert('Could not restore backup file.');
@@ -1367,20 +1694,21 @@
         return;
       }
 
-      ['daily-prep', 'master-catalog', 'analytics', 'staff', 'cloud'].forEach(t => {
+      ['daily-prep', 'master-catalog', 'recipes', 'analytics', 'staff', 'cloud'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         const nav = document.getElementById('nav-' + t);
         if (el) el.classList.add('hidden');
-        if (nav) nav.className = 'flex flex-col items-center py-1 px-2.5 text-slate-400 font-medium';
+        if (nav) nav.className = 'flex flex-col items-center py-1 px-2 text-slate-400 font-medium';
       });
 
       const activeEl = document.getElementById('tab-' + tabId);
       const activeNav = document.getElementById('nav-' + tabId);
       if (activeEl) activeEl.classList.remove('hidden');
-      if (activeNav) activeNav.className = 'flex flex-col items-center py-1 px-2.5 text-amber-400 font-black';
+      if (activeNav) activeNav.className = 'flex flex-col items-center py-1 px-2 text-amber-400 font-black';
 
       if (tabId === 'daily-prep') renderDailyPrepSheet();
       if (tabId === 'master-catalog') renderMasterCatalog();
+      if (tabId === 'recipes') renderRecipesList();
       if (tabId === 'analytics') renderAnalytics();
       if (tabId === 'staff') renderStaffList();
     }
