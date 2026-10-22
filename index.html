@@ -112,7 +112,7 @@
     </div>
   </div>
 
-  <!-- AUTHENTICATION / LOGIN OVERLAY -->
+  <!-- AUTHENTICATION / LOGIN OVERLAY (No Demo Accounts Shown) -->
   <div id="login-overlay" class="fixed inset-0 z-50 bg-slate-950 flex items-center justify-center p-4">
     <div class="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
       <div class="w-14 h-14 mx-auto bg-amber-500/20 border border-amber-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
@@ -137,18 +137,6 @@
           Sign In to Kitchen Station →
         </button>
       </form>
-
-      <div class="pt-2 border-t border-slate-800/80 text-left">
-        <p class="text-[10px] text-slate-500 uppercase font-bold">Quick Demo Accounts:</p>
-        <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
-          <span>👑 Admin: <strong class="text-amber-400">chef.dan</strong> / <strong class="text-slate-300">admin123</strong></span>
-          <button type="button" onclick="quickFillLogin('chef.dan', 'admin123')" class="text-amber-400 font-bold hover:underline">Fill</button>
-        </div>
-        <div class="flex justify-between items-center text-[11px] text-slate-400 mt-1">
-          <span>👨‍🍳 Cook: <strong class="text-indigo-400">alex.dough</strong> / <strong class="text-slate-300">cook123</strong></span>
-          <button type="button" onclick="quickFillLogin('alex.dough', 'cook123')" class="text-indigo-400 font-bold hover:underline">Fill</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -223,7 +211,6 @@
 
       <!-- TAB 1: DAILY PREP SHEET -->
       <section id="tab-daily-prep" class="space-y-2.5">
-        <!-- Compact Metrics Ribbon -->
         <div class="grid grid-cols-4 gap-1.5 text-center bg-slate-900 border border-slate-800 rounded-xl p-2">
           <div>
             <span class="text-[9px] text-slate-400 uppercase font-bold">Total Items</span>
@@ -243,13 +230,12 @@
           </div>
         </div>
 
-        <!-- High-Density Kitchen Prep List -->
         <div id="daily-prep-container" class="space-y-1.5">
           <!-- Rendered dynamically -->
         </div>
       </section>
 
-      <!-- TAB 2: MASTER INGREDIENT & DISH CATALOG (Persistent Forever) -->
+      <!-- TAB 2: MASTER INGREDIENT & DISH CATALOG -->
       <section id="tab-master-catalog" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -266,7 +252,7 @@
         </div>
       </section>
 
-      <!-- TAB 3: STATION MANAGER (Admin Controlled) -->
+      <!-- TAB 3: STATION MANAGER -->
       <section id="tab-stations" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -293,7 +279,7 @@
         </div>
       </section>
 
-      <!-- TAB 4: PRODUCTION ANALYTICS (Totals Till Date) -->
+      <!-- TAB 4: PRODUCTION ANALYTICS -->
       <section id="tab-analytics" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -312,7 +298,7 @@
         </div>
       </section>
 
-      <!-- TAB 5: COOKS & PASSWORDS (Strict Admin Only) -->
+      <!-- TAB 5: COOKS & PASSWORDS (Admin Only) -->
       <section id="tab-staff" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
@@ -405,12 +391,10 @@
         <button onclick="closeModal('modal-print')" class="text-slate-400 text-sm p-1">✕</button>
       </div>
 
-      <!-- Preview Scroller Container -->
       <div id="modal-print-preview-container" class="flex-1 overflow-y-auto bg-white rounded-xl p-3 border border-slate-300">
         <!-- Exact clone populated on open -->
       </div>
 
-      <!-- Export Action Strip -->
       <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-800">
         <button onclick="executeSystemPrint()" class="py-2.5 rounded-xl bg-slate-800 text-slate-100 font-black text-xs flex items-center justify-center space-x-1 border border-slate-700 active:scale-95 shadow">
           <span>🖨️</span>
@@ -647,11 +631,6 @@
       document.getElementById('login-overlay').classList.remove('hidden');
     }
 
-    function quickFillLogin(u, p) {
-      document.getElementById('login-username').value = u;
-      document.getElementById('login-password').value = p;
-    }
-
     function handleUserLogin(e) {
       e.preventDefault();
       const u = document.getElementById('login-username').value.trim();
@@ -752,7 +731,7 @@
       renderDailyPrepSheet();
     }
 
-    // DAILY PREP SHEET RENDERER (High-Density Row-by-Row Layout)
+    // DAILY PREP SHEET RENDERER
     function renderDailyPrepSheet() {
       const container = document.getElementById('daily-prep-container');
       if (!appData.dailyLogs[selectedDate]) {
@@ -810,7 +789,6 @@
         html += `
           <div class="bg-slate-900 border ${isCompleted ? 'border-emerald-500/40 bg-slate-900/95' : 'border-slate-800'} rounded-xl p-2.5 flex flex-col gap-2">
             
-            <!-- Top line: Station badge, Item name & Verification -->
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
                 <span class="text-[9px] font-black text-amber-400 uppercase tracking-wider">${stName}</span>
@@ -827,10 +805,7 @@
               </span>
             </div>
 
-            <!-- Quantitative Box: Allocated (Admin) vs Quantity Done (Cook) -->
             <div class="grid grid-cols-2 gap-2 bg-slate-950 p-2 rounded-lg border border-slate-800/80 items-center">
-              
-              <!-- ALLOCATED TARGET -->
               <div>
                 <span class="text-[9px] text-slate-400 uppercase font-black block">Allocated Target</span>
                 <div class="flex items-center space-x-1 mt-0.5">
@@ -849,7 +824,6 @@
                 </div>
               </div>
 
-              <!-- QUANTITY DONE -->
               <div>
                 <span class="text-[9px] text-emerald-400 uppercase font-black block">Quantity Done</span>
                 <div class="flex items-center space-x-1 mt-0.5">
@@ -865,7 +839,6 @@
               </div>
             </div>
 
-            <!-- Quick Increment Buttons & Updated Signature -->
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-1">
                 <button onclick="incrementDone('${item.id}', 1)" class="px-2 py-0.5 text-[11px] font-black rounded bg-slate-800 text-slate-200 border border-slate-700 active:scale-95">
@@ -880,7 +853,7 @@
               </div>
 
               <span class="text-[9px] text-slate-500 truncate">
-                ${log.updatedBy ? `${log.updatedBy} ${log.updatedTime || ''}` : ''}
+                ${log.updatedBy ? `${log.updatedBy}${log.updatedTime || ''}` : ''}
               </span>
             </div>
 
@@ -947,7 +920,7 @@
       }
     }
 
-    // PRINT & EXPORT ENGINE (Direct System Print, PDF & Image PNG)
+    // PRINT & EXPORT ENGINE
     function buildPrintableTable() {
       document.getElementById('print-doc-date').innerText = selectedDate;
       document.getElementById('print-doc-time').innerText = new Date().toLocaleTimeString();
@@ -1224,7 +1197,7 @@
       `).join('') || '<option value="">No Stations Available</option>';
     }
 
-    // COOKS & PASSWORDS (Strict Admin Only)
+    // COOKS & PASSWORDS (Admin Only)
     function renderStaffList() {
       const container = document.getElementById('staff-members-list');
       container.innerHTML = appData.users.map(u => {
@@ -1341,7 +1314,7 @@
       });
     }
 
-    // PRODUCTION ANALYTICS (Totals Till Date)
+    // PRODUCTION ANALYTICS
     function renderAnalytics() {
       const container = document.getElementById('analytics-summary-cards');
       const range = document.getElementById('analytics-filter-range').value;
