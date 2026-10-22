@@ -38,6 +38,11 @@
       scrollbar-width: none;
     }
 
+    .catalog-item.dragging {
+      opacity: 0.4;
+      background-color: #1e293b;
+    }
+
     @media print {
       body {
         background: #ffffff !important;
@@ -160,9 +165,12 @@
           </div>
         </div>
 
-        <div class="flex items-center space-x-1.5">
+        <div class="flex items-center space-x-2">
           <!-- Real-Time Sync Indicator Dot -->
-          <div id="cloud-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-600 mr-1" title="Offline / Local only"></div>
+          <div class="flex items-center space-x-1 bg-slate-950/80 px-2 py-1 rounded-full border border-slate-800">
+            <div id="cloud-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+            <span id="cloud-status-text" class="text-[9px] font-bold text-slate-400">Live</span>
+          </div>
           <button onclick="handleLogout()" class="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 active:scale-95">
             Sign Out
           </button>
@@ -230,12 +238,12 @@
         </div>
       </section>
 
-      <!-- TAB 2: MASTER INGREDIENT CATALOG -->
+      <!-- TAB 2: MASTER INGREDIENT CATALOG (WITH DRAG & DROP REORDERING) -->
       <section id="tab-master-catalog" class="hidden space-y-2.5">
         <div class="flex items-center justify-between">
           <div>
             <h2 class="text-sm font-black text-white">Master Kitchen Items</h2>
-            <p class="text-[10px] text-slate-400">Items saved here persist across all calendar days</p>
+            <p class="text-[10px] text-slate-400">Drag or use ▲/▼ to arrange the order</p>
           </div>
           <button onclick="openMasterItemModal()" class="px-2.5 py-1 text-xs font-black rounded-lg bg-amber-500 text-slate-950">
             + New Item
@@ -287,18 +295,14 @@
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
           <div class="flex items-center justify-between">
             <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Live Cloud Sync (Firebase)</span>
-            <span id="cloud-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400">Not Connected</span>
+            <span id="cloud-status-badge" class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">Connected & Syncing</span>
           </div>
-          <p class="text-xs text-slate-400">Paste your Firebase Config snippet below to sync all devices in real-time:</p>
-          <textarea id="firebase-config-input" rows="4" placeholder='{"apiKey": "...", "projectId": "..."}' class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-300 outline-none"></textarea>
-          <button onclick="saveAndConnectFirebase()" class="w-full py-2 rounded-lg bg-emerald-600 text-white font-bold text-xs active:scale-95 shadow">
-            Connect & Start Live Sync
-          </button>
+          <p class="text-xs text-slate-400">Connected to project <strong class="text-white">danops</strong>. Real-time changes replicate across all chef and staff screens.</p>
         </div>
 
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
           <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Offline File Backup</span>
-          <p class="text-xs text-slate-400">Download a full snapshot of your prep items and numbers to transfer between devices.</p>
+          <p class="text-xs text-slate-400">Download a full snapshot of your prep items and numbers to save to your phone.</p>
           <div class="grid grid-cols-2 gap-2 pt-1">
             <button onclick="exportBackupData()" class="py-2 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-bold active:scale-95">
               📥 Export Backup
@@ -379,7 +383,7 @@
     Saved Successfully!
   </div>
 
-  <!-- MODAL: ADD / EDIT MASTER ITEM -->
+  <!-- MODAL: ADD / EDIT MASTER ITEM (WITH EXTENDED UNITS) -->
   <div id="modal-master-item" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 no-print">
     <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-2xl p-4 space-y-3">
       <div class="flex justify-between items-center pb-2 border-b border-slate-800">
@@ -397,9 +401,19 @@
           <div>
             <label class="text-slate-400 font-bold block mb-1">Unit of Measurement *</label>
             <select id="item-unit" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white outline-none">
+              <!-- Standard Weight & Volume -->
               <option value="kg">kg (Kilograms)</option>
               <option value="g">g (Grams)</option>
               <option value="L">L (Liters)</option>
+              
+              <!-- Kitchen & Prep Packaging Units -->
+              <option value="Block">Block</option>
+              <option value="Packet">Packet</option>
+              <option value="Bunch">Bunch</option>
+              <option value="Tin">Tin</option>
+              <option value="Batch">Batch</option>
+              
+              <!-- Portions & Containers -->
               <option value="portions">portions</option>
               <option value="trays">trays</option>
               <option value="boxes">boxes</option>
@@ -455,25 +469,34 @@
 
   <!-- APPLICATION ENGINE -->
   <script>
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyBIQVehRukXTo8msmF-vOc8A9o-r-TEhXs",
+      authDomain: "danops.firebaseapp.com",
+      projectId: "danops",
+      storageBucket: "danops.firebasestorage.app",
+      messagingSenderId: "193495659072",
+      appId: "1:193495659072:web:19d294d71d05ec5ca625a5"
+    };
+
     const DEFAULT_CATALOG = [];
 
     const DEFAULT_USERS = [
-      { id: 'u_admin', username: 'chef.dan', password: 'admin123', name: 'Danish Shaikh', role: 'admin' }
+      { id: 'u_admin', username: 'chef.dan', password: 'admin123', name: 'Danish Shaikh', role: 'admin' },
+      { id: 'u_shadab', username: 'shadab', password: 'cook123', name: 'Shadab', role: 'cook' }
     ];
 
     let appData = {
       users: DEFAULT_USERS,
       catalog: DEFAULT_CATALOG,
-      dailyLogs: {},
-      firebaseConfig: ''
+      dailyLogs: {}
     };
 
     let currentUser = null;
     let selectedDate = new Date().toISOString().split('T')[0];
     let db = null;
     let isRemoteUpdate = false;
+    let draggedItemIndex = null;
 
-    // Local Storage Persistence
     function loadPersistedState() {
       try {
         const saved = localStorage.getItem('danops_clean_v3');
@@ -482,8 +505,7 @@
           appData = {
             users: Array.isArray(parsed.users) && parsed.users.length > 0 ? parsed.users : DEFAULT_USERS,
             catalog: Array.isArray(parsed.catalog) ? parsed.catalog : [],
-            dailyLogs: parsed.dailyLogs || {},
-            firebaseConfig: parsed.firebaseConfig || ''
+            dailyLogs: parsed.dailyLogs || {}
           };
         } else {
           persistState();
@@ -514,49 +536,19 @@
       showToast('💾 Saved Successfully!');
     }
 
-    // FIREBASE REAL-TIME SYNC ENGINE
+    // FIREBASE REAL-TIME ENGINE
     function initFirebase() {
-      if (!appData.firebaseConfig) return;
-
       try {
-        let configObj = null;
-        if (typeof appData.firebaseConfig === 'string') {
-          // Parse JSON or JS object formatting
-          let sanitized = appData.firebaseConfig.trim();
-          if (!sanitized.startsWith('{')) {
-            const start = sanitized.indexOf('{');
-            const end = sanitized.lastIndexOf('}');
-            if (start !== -1 && end !== -1) {
-              sanitized = sanitized.substring(start, end + 1);
-            }
-          }
-          try {
-            configObj = JSON.parse(sanitized);
-          } catch (e) {
-            // Support unquoted key format
-            configObj = new Function('return ' + sanitized)();
-          }
-        } else {
-          configObj = appData.firebaseConfig;
-        }
-
-        if (!configObj || !configObj.projectId) return;
-
         if (!firebase.apps.length) {
-          firebase.initializeApp(configObj);
+          firebase.initializeApp(FIREBASE_CONFIG);
         }
         db = firebase.firestore();
 
-        // Update UI status
         const dot = document.getElementById('cloud-status-dot');
-        const badge = document.getElementById('cloud-status-badge');
-        if (dot) dot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse mr-1';
-        if (badge) {
-          badge.innerText = 'Connected & Syncing Live';
-          badge.className = 'text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300';
-        }
+        const text = document.getElementById('cloud-status-text');
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+        if (text) text.innerText = 'Live';
 
-        // Attach Real-Time Document Listener
         db.collection('danops').doc('live_kitchen').onSnapshot(doc => {
           if (doc.exists) {
             const remoteData = doc.data();
@@ -565,7 +557,6 @@
               appData.catalog = remoteData.catalog || [];
               appData.dailyLogs = remoteData.dailyLogs || {};
               if (Array.isArray(remoteData.users) && remoteData.users.length > 0) {
-                // Merge users to preserve local sessions
                 remoteData.users.forEach(ru => {
                   if (!appData.users.some(lu => lu.username.toLowerCase() === ru.username.toLowerCase())) {
                     appData.users.push(ru);
@@ -579,7 +570,6 @@
               isRemoteUpdate = false;
             }
           } else {
-            // First time setup: push current data up
             syncToFirestore(true);
           }
         }, err => {
@@ -604,20 +594,7 @@
       });
     }
 
-    function saveAndConnectFirebase() {
-      const input = document.getElementById('firebase-config-input').value.trim();
-      if (!input) {
-        alert('Please paste your Firebase configuration snippet first.');
-        return;
-      }
-
-      appData.firebaseConfig = input;
-      localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
-      initFirebase();
-      showToast('☁️ Live Cloud Sync Connected!');
-    }
-
-    // Authentication Workflow with Self-Healing Links
+    // AUTHENTICATION
     function initAuth() {
       loadPersistedState();
 
@@ -626,17 +603,7 @@
       const urlPass = urlParams.get('p');
       const urlName = urlParams.get('n');
       const urlRole = urlParams.get('r') || 'cook';
-      const urlFb = urlParams.get('fb');
 
-      // Auto-import firebase config if forwarded in URL
-      if (urlFb) {
-        try {
-          appData.firebaseConfig = decodeURIComponent(urlFb);
-          localStorage.setItem('danops_clean_v3', JSON.stringify(appData));
-        } catch(e){}
-      }
-
-      // Auto-register via private URL
       if (urlUser && urlPass) {
         let matched = appData.users.find(u => u.username.toLowerCase() === urlUser.toLowerCase());
         if (!matched) {
@@ -661,7 +628,6 @@
         return;
       }
 
-      // Check stored session
       const storedUserId = localStorage.getItem('danops_session_uid');
       if (storedUserId) {
         const found = appData.users.find(u => u.id === storedUserId);
@@ -730,7 +696,6 @@
       document.getElementById('login-overlay').classList.remove('hidden');
     }
 
-    // Date Navigation
     function navigateDay(delta) {
       const d = new Date(selectedDate);
       d.setDate(d.getDate() + delta);
@@ -758,6 +723,7 @@
       }
 
       const dayRecord = appData.dailyLogs[selectedDate];
+      const isAdmin = currentUser && currentUser.role === 'admin';
 
       if (appData.catalog.length === 0) {
         container.innerHTML = `
@@ -774,12 +740,11 @@
       let totalCount = 0;
       let inProgressCount = 0;
       let completedCount = 0;
+      let visibleItemCount = 0;
 
       let html = '';
 
       appData.catalog.forEach(item => {
-        totalCount++;
-
         if (!dayRecord[item.id]) {
           dayRecord[item.id] = {
             target: item.defaultTarget || 0,
@@ -791,18 +756,43 @@
         }
 
         const log = dayRecord[item.id];
-        const isCompleted = log.target > 0 && log.done >= log.target;
-        if (isCompleted) completedCount++;
-        else if (log.done > 0) inProgressCount++;
+        const isTargetZero = (log.target === 0 || !log.target);
 
-        const isAdmin = currentUser && currentUser.role === 'admin';
+        // HIDE TARGET 0 FROM STAFF PHONES
+        if (!isAdmin && isTargetZero) {
+          return;
+        }
+
+        visibleItemCount++;
+
+        if (log.target > 0) {
+          totalCount++;
+          if (log.done >= log.target) {
+            completedCount++;
+          } else if (log.done > 0) {
+            inProgressCount++;
+          }
+        }
+
+        const isCompleted = log.target > 0 && log.done >= log.target;
 
         html += `
-          <div class="bg-slate-900 border ${isCompleted ? 'border-emerald-500/40 bg-slate-900/95' : 'border-slate-800'} rounded-xl p-3 flex flex-col gap-2 shadow-sm">
+          <div class="bg-slate-900 border ${
+            isCompleted 
+              ? 'border-emerald-500/40 bg-slate-900/95' 
+              : (isTargetZero ? 'border-slate-800 opacity-60' : 'border-slate-800')
+          } rounded-xl p-3 flex flex-col gap-2 shadow-sm">
             
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
-                <h3 class="text-xs font-black text-white leading-tight truncate">${item.name}</h3>
+                <div class="flex items-center gap-1.5">
+                  <h3 class="text-xs font-black text-white leading-tight truncate">${item.name}</h3>
+                  ${isAdmin && isTargetZero ? `
+                    <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                      Excluded from Staff
+                    </span>
+                  ` : ''}
+                </div>
                 ${item.notes ? `<p class="text-[10px] text-slate-400 italic truncate">${item.notes}</p>` : ''}
               </div>
 
@@ -825,7 +815,7 @@
                       step="any"
                       value="${log.target}" 
                       onchange="updateItemTarget('${item.id}', this.value)"
-                      class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-black text-amber-400 focus:border-amber-500 outline-none"
+                      class="w-16 bg-slate-900 border ${isTargetZero ? 'border-slate-700 text-slate-500' : 'border-amber-500/60 text-amber-400'} rounded px-1.5 py-0.5 text-xs font-black focus:border-amber-500 outline-none"
                     />
                   ` : `
                     <span class="text-xs font-black text-amber-400">${log.target}</span>
@@ -871,7 +861,18 @@
         `;
       });
 
-      container.innerHTML = html;
+      if (!isAdmin && visibleItemCount === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-slate-900 border border-dashed border-slate-800 rounded-2xl p-6">
+            <span class="text-4xl block mb-2">🎉</span>
+            <p class="font-bold text-white text-sm">No prep scheduled for today</p>
+            <p class="text-xs text-slate-400 mt-1">The Head Chef has not allocated any prep targets yet.</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = html;
+      }
+
       updateMetrics(totalCount, inProgressCount, completedCount);
     }
 
@@ -884,7 +885,7 @@
     }
 
     function updateItemTarget(itemId, val) {
-      const num = parseFloat(val) || 0;
+      const num = Math.max(0, parseFloat(val) || 0);
       if (!appData.dailyLogs[selectedDate]) appData.dailyLogs[selectedDate] = {};
       if (!appData.dailyLogs[selectedDate][itemId]) {
         appData.dailyLogs[selectedDate][itemId] = { target: num, done: 0, status: 'pending' };
@@ -896,7 +897,7 @@
 
       persistState();
       renderDailyPrepSheet();
-      showToast('Target Saved');
+      showToast(num === 0 ? 'Target set to 0 (Hidden from staff)' : 'Target Saved');
     }
 
     function updateItemDone(itemId, val) {
@@ -930,7 +931,165 @@
       }
     }
 
-    // PRINT & EXPORT ENGINE
+    // MASTER CATALOG WITH DRAG & DROP AND BUTTON REORDERING
+    function renderMasterCatalog() {
+      const container = document.getElementById('master-catalog-list');
+      if (appData.catalog.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 py-8 text-center border border-dashed border-slate-800 rounded-xl">Your item catalog is empty. Tap "+ New Item" to add your kitchen items.</p>';
+        return;
+      }
+
+      const isAdmin = currentUser && currentUser.role === 'admin';
+
+      container.innerHTML = appData.catalog.map((item, index) => {
+        return `
+          <div 
+            class="catalog-item bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition-colors"
+            draggable="${isAdmin}"
+            data-index="${index}"
+            ondragstart="handleDragStart(event)"
+            ondragover="handleDragOver(event)"
+            ondrop="handleDrop(event)"
+            ondragend="handleDragEnd(event)"
+          >
+            <div class="flex items-center space-x-2.5 flex-1 min-w-0">
+              ${isAdmin ? `
+                <div class="cursor-grab text-slate-500 hover:text-amber-400 select-none text-base px-1">
+                  ⠿
+                </div>
+              ` : ''}
+              <div class="flex-1 min-w-0">
+                <p class="text-xs font-bold text-white truncate">${item.name}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5">Unit: <strong>${item.unit}</strong> • Default Daily: ${item.defaultTarget || 0} ${item.unit}</p>
+              </div>
+            </div>
+
+            ${isAdmin ? `
+              <div class="flex items-center space-x-1.5 ml-2">
+                <button onclick="moveItemOrder(${index}, -1)" class="p-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 active:scale-95" title="Move Up">
+                  ▲
+                </button>
+                <button onclick="moveItemOrder(${index}, 1)" class="p-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold border border-slate-700 active:scale-95" title="Move Down">
+                  ▼
+                </button>
+                
+                <button onclick="openEditMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
+                <button onclick="deleteMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function moveItemOrder(index, direction) {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= appData.catalog.length) return;
+
+      const [movedItem] = appData.catalog.splice(index, 1);
+      appData.catalog.splice(targetIndex, 0, movedItem);
+
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Order Updated');
+    }
+
+    function handleDragStart(e) {
+      draggedItemIndex = parseInt(e.currentTarget.getAttribute('data-index'));
+      e.currentTarget.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      const targetElement = e.currentTarget.closest('.catalog-item');
+      if (!targetElement) return;
+
+      const targetIndex = parseInt(targetElement.getAttribute('data-index'));
+      if (draggedItemIndex === null || draggedItemIndex === targetIndex) return;
+
+      const [movedItem] = appData.catalog.splice(draggedItemIndex, 1);
+      appData.catalog.splice(targetIndex, 0, movedItem);
+
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Order Updated');
+    }
+
+    function handleDragEnd(e) {
+      draggedItemIndex = null;
+      document.querySelectorAll('.catalog-item').forEach(el => el.classList.remove('dragging'));
+    }
+
+    function openMasterItemModal() {
+      document.getElementById('edit-item-id').value = '';
+      document.getElementById('item-name').value = '';
+      document.getElementById('item-unit').value = 'kg';
+      document.getElementById('item-default-target').value = '';
+      document.getElementById('item-notes').value = '';
+      document.getElementById('modal-item-title').innerText = 'Add Prep Item';
+      document.getElementById('modal-master-item').classList.remove('hidden');
+    }
+
+    function openEditMasterItem(id) {
+      const item = appData.catalog.find(c => c.id === id);
+      if (!item) return;
+      document.getElementById('edit-item-id').value = item.id;
+      document.getElementById('item-name').value = item.name;
+      document.getElementById('item-unit').value = item.unit;
+      document.getElementById('item-default-target').value = item.defaultTarget || 0;
+      document.getElementById('item-notes').value = item.notes || '';
+      document.getElementById('modal-item-title').innerText = 'Edit Prep Item';
+      document.getElementById('modal-master-item').classList.remove('hidden');
+    }
+
+    function handleSaveMasterItem(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-item-id').value;
+      const name = document.getElementById('item-name').value.trim();
+      const unit = document.getElementById('item-unit').value;
+      const defaultTarget = parseFloat(document.getElementById('item-default-target').value) || 0;
+      const notes = document.getElementById('item-notes').value.trim();
+
+      if (id) {
+        const item = appData.catalog.find(c => c.id === id);
+        if (item) {
+          item.name = name;
+          item.unit = unit;
+          item.defaultTarget = defaultTarget;
+          item.notes = notes;
+        }
+      } else {
+        appData.catalog.push({
+          id: 'item_' + Date.now(),
+          name, unit, defaultTarget, notes
+        });
+      }
+
+      closeModal('modal-master-item');
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Item Saved');
+    }
+
+    function deleteMasterItem(id) {
+      if (!confirm('Permanently delete this item?')) return;
+      appData.catalog = appData.catalog.filter(c => c.id !== id);
+      persistState();
+      renderMasterCatalog();
+      renderDailyPrepSheet();
+      showToast('Item Deleted');
+    }
+
+    // PRINT & EXPORT
     function buildPrintableTable() {
       document.getElementById('print-doc-date').innerText = selectedDate;
       document.getElementById('print-doc-time').innerText = new Date().toLocaleTimeString();
@@ -944,6 +1103,8 @@
       let idx = 1;
       appData.catalog.forEach(item => {
         const log = dayRecord[item.id] || { target: item.defaultTarget || 0, done: 0 };
+        if (log.target === 0 || !log.target) return;
+
         const isDone = log.target > 0 && log.done >= log.target;
 
         const tr = document.createElement('tr');
@@ -1017,105 +1178,13 @@
       });
     }
 
-    // MASTER CATALOG MANAGEMENT
-    function renderMasterCatalog() {
-      const container = document.getElementById('master-catalog-list');
-      if (appData.catalog.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-500 py-8 text-center border border-dashed border-slate-800 rounded-xl">Your item catalog is empty. Tap "+ New Item" to add your kitchen items.</p>';
-        return;
-      }
-
-      container.innerHTML = appData.catalog.map(item => {
-        return `
-          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-            <div>
-              <p class="text-xs font-bold text-white">${item.name}</p>
-              <p class="text-[10px] text-slate-400 mt-0.5">Unit: <strong>${item.unit}</strong> • Default Daily: ${item.defaultTarget || 0} ${item.unit}</p>
-            </div>
-            ${currentUser && currentUser.role === 'admin' ? `
-              <div class="flex items-center space-x-1.5">
-                <button onclick="openEditMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-slate-800 text-amber-400 text-xs font-bold active:scale-95">✏️</button>
-                <button onclick="deleteMasterItem('${item.id}')" class="p-1.5 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold active:scale-95">🗑️</button>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
-    }
-
-    function openMasterItemModal() {
-      document.getElementById('edit-item-id').value = '';
-      document.getElementById('item-name').value = '';
-      document.getElementById('item-default-target').value = '';
-      document.getElementById('item-notes').value = '';
-      document.getElementById('modal-item-title').innerText = 'Add Prep Item';
-      document.getElementById('modal-master-item').classList.remove('hidden');
-    }
-
-    function openEditMasterItem(id) {
-      const item = appData.catalog.find(c => c.id === id);
-      if (!item) return;
-      document.getElementById('edit-item-id').value = item.id;
-      document.getElementById('item-name').value = item.name;
-      document.getElementById('item-unit').value = item.unit;
-      document.getElementById('item-default-target').value = item.defaultTarget || 0;
-      document.getElementById('item-notes').value = item.notes || '';
-      document.getElementById('modal-item-title').innerText = 'Edit Prep Item';
-      document.getElementById('modal-master-item').classList.remove('hidden');
-    }
-
-    function handleSaveMasterItem(e) {
-      e.preventDefault();
-      const id = document.getElementById('edit-item-id').value;
-      const name = document.getElementById('item-name').value.trim();
-      const unit = document.getElementById('item-unit').value;
-      const defaultTarget = parseFloat(document.getElementById('item-default-target').value) || 0;
-      const notes = document.getElementById('item-notes').value.trim();
-
-      if (id) {
-        const item = appData.catalog.find(c => c.id === id);
-        if (item) {
-          item.name = name;
-          item.unit = unit;
-          item.defaultTarget = defaultTarget;
-          item.notes = notes;
-        }
-      } else {
-        appData.catalog.push({
-          id: 'item_' + Date.now(),
-          name, unit, defaultTarget, notes
-        });
-      }
-
-      closeModal('modal-master-item');
-      persistState();
-      renderMasterCatalog();
-      renderDailyPrepSheet();
-      showToast('Item Saved');
-    }
-
-    function deleteMasterItem(id) {
-      if (!confirm('Permanently delete this item?')) return;
-      appData.catalog = appData.catalog.filter(c => c.id !== id);
-      persistState();
-      renderMasterCatalog();
-      renderDailyPrepSheet();
-      showToast('Item Deleted');
-    }
-
-    // USERS & PASSWORDS (With One-Tap Auto-Enrollment & Cloud Config forwarding)
+    // USERS & PASSWORDS
     function renderStaffList() {
       const container = document.getElementById('staff-members-list');
       container.innerHTML = appData.users.map(u => {
         const isSelf = currentUser && currentUser.id === u.id;
         const currentUrl = window.location.origin + window.location.pathname;
-        
-        let linkParams = `u=${encodeURIComponent(u.username)}&p=${encodeURIComponent(u.password)}&n=${encodeURIComponent(u.name)}&r=${u.role}`;
-        if (appData.firebaseConfig) {
-          linkParams += `&fb=${encodeURIComponent(appData.firebaseConfig)}`;
-        }
-
-        const privateLink = `${currentUrl}?${linkParams}`;
+        const privateLink = `${currentUrl}?u=${encodeURIComponent(u.username)}&p=${encodeURIComponent(u.password)}&n=${encodeURIComponent(u.name)}&r=${u.role}`;
         const whatsappMsg = encodeURIComponent(`Hi ${u.name}, here is your DanOps Kitchen Prep access:\n${privateLink}`);
         const whatsappUrl = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
 
@@ -1312,9 +1381,6 @@
       if (tabId === 'master-catalog') renderMasterCatalog();
       if (tabId === 'analytics') renderAnalytics();
       if (tabId === 'staff') renderStaffList();
-      if (tabId === 'cloud' && appData.firebaseConfig) {
-        document.getElementById('firebase-config-input').value = appData.firebaseConfig;
-      }
     }
 
     function closeModal(id) {
